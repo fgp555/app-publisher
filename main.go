@@ -10,8 +10,8 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-// version puede reemplazarse al compilar con -ldflags.
-var version = "1.0.8"
+// version can be overridden at build time with -ldflags.
+var version = "1.0.9"
 
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == "--version" {
@@ -31,9 +31,9 @@ func main() {
 
 	configLabel := cfg.ConfigPath
 	if configLabel == "" {
-		configLabel = "automática (sin play-tool.json)"
+		configLabel = "automatic (no play-tool.json)"
 	}
-	fmt.Printf("⚙️  Config:   %s\n📱 App:      %s\n📂 Proyecto: %s\n", configLabel, cfg.Pkg, cfg.GradleRoot)
+	fmt.Printf("⚙️  Config:   %s\n📱 App:      %s\n📂 Project:  %s\n", configLabel, cfg.Pkg, cfg.GradleRoot)
 
 	if len(os.Args) > 1 {
 		if err := runCI(cfg, os.Args[1:]); err != nil {
@@ -48,11 +48,11 @@ func main() {
 
 func runInteractive(cfg Config) {
 	for {
-		idx, err := selectOption("🧭 Menú principal", []string{
-			"🔨 Build e instalación",
-			"🔍 Información y verificación",
+		idx, err := selectOption("🧭 Main menu", []string{
+			"🔨 Build and install",
+			"🔍 Info and verification",
 			"☁️  Google Play",
-			"🚪 Salir",
+			"🚪 Exit",
 		})
 		if err != nil {
 			return
@@ -75,16 +75,16 @@ func buildInstallMenu(cfg Config) {
 	items := []string{
 		"🛠️  assembleDebug",
 		"📲 installDebug (Gradle)",
-		"📲 adbInstallDebug (APK existente)",
+		"📲 adbInstallDebug (existing APK)",
 		"🛠️  assembleRelease",
 		"📲 installRelease (Gradle)",
-		"📲 adbInstallRelease (APK existente)",
+		"📲 adbInstallRelease (existing APK)",
 		"📦 bundleRelease",
-		"🧹 Build AAB limpio (clean + bundleRelease)",
-		"↩️  Volver",
+		"🧹 Clean AAB build (clean + bundleRelease)",
+		"↩️  Back",
 	}
 	for {
-		idx, err := selectOption("🔨 Build e instalación", items)
+		idx, err := selectOption("🔨 Build and install", items)
 		if err != nil || idx == len(items)-1 {
 			return
 		}
@@ -96,7 +96,7 @@ func buildInstallMenu(cfg Config) {
 			{"installRelease"},
 			{"adbInstallRelease"},
 			{"bundleRelease"},
-			{"build"},
+			{"cleanBundleRelease"},
 		}
 		report(runCI(cfg, commands[idx]))
 	}
@@ -114,7 +114,7 @@ func infoMenu(cfg Config) {
 		"🎯 manifest target-sdk debug",
 		"🤖 manifest min-sdk release",
 		"🎯 manifest target-sdk release",
-		"↩️  Volver",
+		"↩️  Back",
 	}
 	commands := [][]string{
 		{"info", "assembleDebug"},
@@ -129,7 +129,7 @@ func infoMenu(cfg Config) {
 		{"manifest", "target-sdk", "release"},
 	}
 	for {
-		idx, err := selectOption("🔍 Información y verificación", items)
+		idx, err := selectOption("🔍 Info and verification", items)
 		if err != nil || idx == len(items)-1 {
 			return
 		}
@@ -139,11 +139,11 @@ func infoMenu(cfg Config) {
 
 func googlePlayMenu(cfg Config) {
 	items := []string{
-		"🔎 Ver versionCode publicado",
-		"📤 Subir AAB ya compilado",
-		"🚀 Compilar y subir",
+		"🔎 Show published versionCode",
+		"📤 Upload existing AAB",
+		"🚀 Build and upload",
 		"🔢 Deploy (bump + build + upload)",
-		"↩️  Volver",
+		"↩️  Back",
 	}
 	for {
 		idx, err := selectOption("☁️  Google Play", items)
@@ -155,7 +155,7 @@ func googlePlayMenu(cfg Config) {
 		case 0:
 			report(showVersion(cfg))
 		case 1:
-			if confirm(fmt.Sprintf("📤 ¿Subir %s a %s?", cfg.AAB, cfg.Track)) {
+			if confirm(fmt.Sprintf("📤 Upload %s to %s?", cfg.AAB, cfg.Track)) {
 				report(uploadAAB(cfg))
 			}
 		case 2:
@@ -163,11 +163,11 @@ func googlePlayMenu(cfg Config) {
 				report(err)
 				continue
 			}
-			if confirm(fmt.Sprintf("🚀 ¿Subir el AAB recién compilado a %s?", cfg.Track)) {
+			if confirm(fmt.Sprintf("🚀 Upload the newly built AAB to %s?", cfg.Track)) {
 				report(uploadAAB(cfg))
 			}
 		case 3:
-			if confirm(fmt.Sprintf("🔢 ¿Incrementar versionCode, compilar y publicar en %s?", cfg.Track)) {
+			if confirm(fmt.Sprintf("🔢 Increment versionCode, build, and publish to %s?", cfg.Track)) {
 				report(runCI(cfg, []string{"deploy"}))
 			}
 		}
@@ -177,41 +177,44 @@ func googlePlayMenu(cfg Config) {
 func printHelp() {
 	fmt.Printf(`play-tool %s
 
-Uso:
-  play-tool                 Abre el menú interactivo
-  play-tool show            Muestra las versiones publicadas
+Usage:
+  play-tool
+  play-tool show
   play-tool assembleDebug
-  play-tool installDebug
   play-tool assembleRelease
-  play-tool installRelease
   play-tool bundleRelease
+  play-tool cleanBundleRelease
+  play-tool installDebug
+  play-tool installRelease
   play-tool adbInstallDebug
   play-tool adbInstallRelease
-  play-tool info assembleDebug|assembleRelease|bundleRelease
-  play-tool build           Compila el AAB release
-  play-tool build apk debug|release
-  play-tool build bundle release
-  play-tool install gradle release
-  play-tool install apk debug|release
-  play-tool verify apk debug|release
+  play-tool info assembleDebug
+  play-tool info assembleRelease
+  play-tool info bundleRelease
+  play-tool verify apk debug
+  play-tool verify apk release
   play-tool verify bundle
-  play-tool manifest min-sdk|target-sdk debug|release
-  play-tool upload          Sube el AAB configurado
-  play-tool deploy          Actualiza versionCode, compila y sube
-  play-tool --version       Muestra la versión de play-tool, Go y la plataforma
-  play-tool --help          Muestra esta ayuda
+  play-tool manifest min-sdk debug
+  play-tool manifest min-sdk release
+  play-tool manifest target-sdk debug
+  play-tool manifest target-sdk release
+  play-tool upload
+  play-tool deploy
+  play-tool initWorkflow
+  play-tool --version
+  play-tool --help
 
-Configuración:
-  play-tool.json es opcional. Reconoce Android nativo y React Native.
-  package se detecta desde applicationId en build.gradle.kts o build.gradle.
-  En React Native, el wrapper se ejecuta desde android/ y el JSON puede estar
-  en la raíz que contiene package.json.
-  aab usa la ruta release estándar y PLAY_TOOL_KEY indica la clave de Google Play.
-  Los APK usan las rutas estándar bajo app/build/outputs/apk; puedes sobrescribirlas
-  con apkDebug y apkRelease. Las herramientas Android se buscan en el SDK o PATH;
-  keytool se busca en JAVA_HOME o PATH.
-  info bundleRelease también necesita BUNDLETOOL_JAR apuntando a bundletool-all.jar.
-  El JSON puede sobrescribir esos valores; sus rutas relativas parten de su carpeta.
+Configuration:
+  play-tool.json is optional. Native Android and React Native projects are detected.
+  package is detected from applicationId in build.gradle.kts or build.gradle.
+  For React Native, the wrapper runs from android/, and the JSON can be placed
+  in the directory containing package.json.
+  aab uses the standard release path, and PLAY_TOOL_KEY points to the Google Play key.
+  APKs use the standard paths under app/build/outputs/apk; override them with
+  apkDebug and apkRelease. Android tools are searched in the SDK or PATH;
+  keytool is searched in JAVA_HOME or PATH.
+  info bundleRelease also requires PLAY_BUNDLETOOL_JAR to point to bundletool-all.jar.
+  The JSON can override these values; relative paths are resolved from its directory.
 `, version)
 }
 
@@ -226,13 +229,13 @@ func selectOption(label string, items []string) (int, error) {
 }
 
 func confirm(question string) bool {
-	idx, err := selectOption(question, []string{"Sí", "No"})
+	idx, err := selectOption(question, []string{"Yes", "No"})
 	return err == nil && idx == 0
 }
 
-// build ejecuta Gradle en la carpeta del proyecto definida en play-tool.json.
+// build runs Gradle from the project directory defined in play-tool.json.
 func build(cfg Config) error {
-	fmt.Println("🛠️  Compilando AAB release...")
+	fmt.Println("🛠️  Building release AAB...")
 	return runGradleTasks(cfg, "clean", "bundleRelease")
 }
 
@@ -254,5 +257,5 @@ func report(err error) {
 		fmt.Println("❌ Error:", err)
 		return
 	}
-	fmt.Println("✅ Listo.")
+		fmt.Println("✅ Done.")
 }

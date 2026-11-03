@@ -9,7 +9,7 @@ import (
 
 var versionCodeRe = regexp.MustCompile(`(?m)^([ \t]*versionCode(?:[ \t]*=[ \t]*|[ \t]+))([0-9]+)\b`)
 
-// bumpVersionCode escribe en build.gradle(.kts) el versionCode publicado + 1.
+// bumpVersionCode writes the published versionCode plus one to build.gradle(.kts).
 func bumpVersionCode(cfg Config) (int64, error) {
 	max, err := publishedMax(cfg)
 	if err != nil {
@@ -23,10 +23,10 @@ func bumpVersionCode(cfg Config) (int64, error) {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return 0, fmt.Errorf("no se pudo leer %s: %w", path, err)
+		return 0, fmt.Errorf("could not read %s: %w", path, err)
 	}
 	if !versionCodeRe.Match(data) {
-		return 0, fmt.Errorf("no se encontró una declaración versionCode numérica en %s", path)
+		return 0, fmt.Errorf("no numeric versionCode declaration found in %s", path)
 	}
 
 	nextString := []byte(strconv.FormatInt(next, 10))
@@ -36,7 +36,7 @@ func bumpVersionCode(cfg Config) (int64, error) {
 		return append(updated, nextString...)
 	})
 	if err := os.WriteFile(path, out, 0644); err != nil {
-		return 0, fmt.Errorf("no se pudo actualizar versionCode en %s: %w", path, err)
+		return 0, fmt.Errorf("could not update versionCode in %s: %w", path, err)
 	}
 	return next, nil
 }

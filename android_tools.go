@@ -69,7 +69,7 @@ func resolveAndroidTool(name string) (string, error) {
 	if path, err := lookPath(name); err == nil {
 		return path, nil
 	}
-	return "", fmt.Errorf("no se encontró %s; revisa ANDROID_SDK_ROOT/ANDROID_HOME o agrega la herramienta al PATH", name)
+	return "", fmt.Errorf("%s not found; check ANDROID_SDK_ROOT/ANDROID_HOME or add the tool to PATH", name)
 }
 
 func resolveKeytool() (string, error) {
@@ -81,7 +81,7 @@ func resolveKeytool() (string, error) {
 	if path, err := lookPath("keytool"); err == nil {
 		return path, nil
 	}
-	return "", fmt.Errorf("no se encontró keytool; revisa JAVA_HOME o agrega el JDK al PATH")
+	return "", fmt.Errorf("keytool not found; check JAVA_HOME or add the JDK to PATH")
 }
 
 func newestVersionedTool(sdkRoot, relativeDir, tool string, suffix ...string) string {
@@ -171,7 +171,7 @@ func lookPath(name string) (string, error) {
 			return path, nil
 		}
 	}
-	return "", fmt.Errorf("%s no está en PATH", name)
+	return "", fmt.Errorf("%s is not in PATH", name)
 }
 
 func runTool(path, dir string, args ...string) error {

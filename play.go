@@ -20,40 +20,40 @@ import (
 
 func newService(key string) (*androidpublisher.Service, error) {
 	if key == "" {
-		return nil, fmt.Errorf("falta el campo obligatorio \"key\" en %s", configName)
+		return nil, fmt.Errorf("required field \"key\" is missing from %s", configName)
 	}
 	info, err := os.Stat(key)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("no existe la clave de Google Play en %s; revisa el campo \"key\" de %s: %w", key, configName, err)
+			return nil, fmt.Errorf("Google Play key does not exist at %s; check the \"key\" field in %s: %w", key, configName, err)
 		}
-		return nil, fmt.Errorf("no se pudo acceder a la clave de Google Play en %s; revisa el campo \"key\" de %s: %w", key, configName, err)
+		return nil, fmt.Errorf("could not access the Google Play key at %s; check the \"key\" field in %s: %w", key, configName, err)
 	}
 	if info.IsDir() {
-		return nil, fmt.Errorf("la ruta configurada en el campo \"key\" es una carpeta, no un archivo: %s", key)
+		return nil, fmt.Errorf("the path configured in the \"key\" field is a directory, not a file: %s", key)
 	}
 
 	svc, err := androidpublisher.NewService(context.Background(), option.WithCredentialsFile(key))
 	if err != nil {
-		return nil, fmt.Errorf("no se pudo cargar la clave de Google Play %s: %w", key, err)
+		return nil, fmt.Errorf("could not load Google Play key %s: %w", key, err)
 	}
 	return svc, nil
 }
 
-// showVersion muestra los versionCode publicados en la pista. No cambia nada.
+// showVersion displays versionCodes published to the track. It makes no changes.
 func showVersion(cfg Config) error {
-	fmt.Println("🔐 Validando credenciales de Google Play...")
+	fmt.Println("🔐 Validating Google Play credentials...")
 	svc, err := newService(cfg.Key)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("🔎 Consultando Google Play (%s)...\n", cfg.Track)
+	fmt.Printf("🔎 Querying Google Play (%s)...\n", cfg.Track)
 	edit, err := svc.Edits.Insert(cfg.Pkg, &androidpublisher.AppEdit{}).Do()
 	if err != nil {
 		return err
 	}
-	// Sin Commit, la edit se descarta al cerrarla.
+	// Without Commit, the edit is discarded when closed.
 	defer svc.Edits.Delete(cfg.Pkg, edit.Id).Do()
 
 	t, err := svc.Edits.Tracks.Get(cfg.Pkg, edit.Id, cfg.Track).Do()
@@ -72,32 +72,32 @@ func showVersion(cfg Config) error {
 		}
 	}
 
-	fmt.Printf("🎯 Pista:           %s\n", cfg.Track)
-	fmt.Printf("📋 Versiones:       %v\n", codes)
+	fmt.Printf("🎯 Track:            %s\n", cfg.Track)
+	fmt.Printf("📋 Versions:         %v\n", codes)
 	fmt.Printf("🏷️  versionCode max: %d\n", max)
 	return nil
 }
 
-// uploadAAB sube el AAB ya compilado y lo publica en la pista.
+// uploadAAB uploads the already-built AAB and publishes it to the track.
 func uploadAAB(cfg Config) error {
 	f, err := os.Open(cfg.AAB)
 	if err != nil {
-		return fmt.Errorf("no se pudo abrir el AAB en %s; revisa el campo \"aab\" de %s: %w", cfg.AAB, configName, err)
+		return fmt.Errorf("could not open AAB at %s; check the \"aab\" field in %s: %w", cfg.AAB, configName, err)
 	}
 	defer f.Close()
 	info, err := f.Stat()
 	if err != nil {
-		return fmt.Errorf("no se pudo obtener el tamaño del AAB %s: %w", cfg.AAB, err)
+		return fmt.Errorf("could not get the size of AAB %s: %w", cfg.AAB, err)
 	}
 	fileSize := info.Size()
 
-	fmt.Println("🔐 Validando credenciales de Google Play...")
+	fmt.Println("🔐 Validating Google Play credentials...")
 	svc, err := newService(cfg.Key)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("🧾 Preparando la carga...")
+	fmt.Println("🧾 Preparing upload...")
 	edit, err := svc.Edits.Insert(cfg.Pkg, &androidpublisher.AppEdit{}).Do()
 	if err != nil {
 		return err
@@ -110,7 +110,7 @@ func uploadAAB(cfg Config) error {
 		}
 	}()
 
-	fmt.Printf("🔎 Revisando la pista %q...\n", cfg.Track)
+	fmt.Printf("🔎 Checking track %q...\n", cfg.Track)
 	t, err := svc.Edits.Tracks.Get(cfg.Pkg, edit.Id, cfg.Track).Do()
 	if err != nil {
 		return err
@@ -124,7 +124,7 @@ func uploadAAB(cfg Config) error {
 		}
 	}
 
-	fmt.Printf("📦 Archivo: %s (%s)\n", cfg.AAB, formatBytes(fileSize))
+	fmt.Printf("📦 File: %s (%s)\n", cfg.AAB, formatBytes(fileSize))
 	printUploadProgress(0, fileSize)
 	bundle, err := svc.Edits.Bundles.Upload(cfg.Pkg, edit.Id).
 		ResumableMedia(context.Background(), f, fileSize, "application/octet-stream").
@@ -132,17 +132,17 @@ func uploadAAB(cfg Config) error {
 		Do()
 	if err != nil {
 		fmt.Println()
-		return fmt.Errorf("no se pudo subir el AAB: %w", err)
+		return fmt.Errorf("could not upload AAB: %w", err)
 	}
 	printUploadProgress(fileSize, fileSize)
 	fmt.Println()
 
 	if bundle.VersionCode <= maxPublished {
-		return fmt.Errorf("el versionCode del AAB (%d) debe ser mayor que el publicado (%d); cambia versionCode y recompila",
+		return fmt.Errorf("AAB versionCode (%d) must be greater than the published versionCode (%d); update versionCode and rebuild",
 			bundle.VersionCode, maxPublished)
 	}
 
-	fmt.Printf("🚀 Publicando versionCode %d en %q...\n", bundle.VersionCode, cfg.Track)
+	fmt.Printf("🚀 Publishing versionCode %d to %q...\n", bundle.VersionCode, cfg.Track)
 	_, err = svc.Edits.Tracks.Update(cfg.Pkg, edit.Id, cfg.Track, &androidpublisher.Track{
 		Track: cfg.Track,
 		Releases: []*androidpublisher.TrackRelease{
@@ -153,22 +153,22 @@ func uploadAAB(cfg Config) error {
 		},
 	}).Do()
 	if err != nil {
-		return fmt.Errorf("no se pudo asignar el release: %w", err)
+		return fmt.Errorf("could not assign the release: %w", err)
 	}
 
-	fmt.Println("⏳ Confirmando publicación...")
+	fmt.Println("⏳ Confirming publication...")
 	if _, err := svc.Edits.Commit(cfg.Pkg, edit.Id).Do(); err != nil {
-		return fmt.Errorf("no se pudo confirmar la edit: %w", err)
+		return fmt.Errorf("could not commit the edit: %w", err)
 	}
 	committed = true
 
-	fmt.Printf("✅ Subido versionCode %d a la pista %q\n", bundle.VersionCode, cfg.Track)
+	fmt.Printf("✅ Uploaded versionCode %d to track %q\n", bundle.VersionCode, cfg.Track)
 	return nil
 }
 
 func printUploadProgress(current, total int64) {
 	if total <= 0 {
-		fmt.Print("\r⬆️  Subiendo AAB...")
+		fmt.Print("\r⬆️  Uploading AAB...")
 		return
 	}
 	if current < 0 {
@@ -180,7 +180,7 @@ func printUploadProgress(current, total int64) {
 	const width = 24
 	filled := percent * width / 100
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
-	fmt.Printf("\r⬆️  Subiendo AAB [%s] %3d%% (%s / %s)", bar, percent, formatBytes(current), formatBytes(total))
+	fmt.Printf("\r⬆️  Uploading AAB [%s] %3d%% (%s / %s)", bar, percent, formatBytes(current), formatBytes(total))
 }
 
 func formatBytes(size int64) string {

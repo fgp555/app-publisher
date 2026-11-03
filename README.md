@@ -1,31 +1,39 @@
 # play-tool
 
-`play-tool` permite consultar y publicar una app Android en Google Play, tanto nativa como React Native. Detecta el wrapper Gradle para compilar/subir y reconoce la raíz React Native mediante `package.json` y `android/`.
+`play-tool` lets you inspect and publish native Android and React Native apps on Google Play. It detects the Gradle wrapper for building and uploading, and identifies a React Native project root using `package.json` and `android/`.
 
-## Instalación en Windows
+## Installation on Windows
 
-Desde PowerShell, instala el ejecutable:
+Install the latest CLI version from any terminal with Go installed:
+
+```sh
+go install github.com/fgp555/play-tool@latest
+```
+
+Go installs the executable in `$(go env GOPATH)/bin` (usually `%USERPROFILE%/go/bin` on Windows). Add that directory to your `PATH` to run `play-tool` from any terminal. Open a new terminal after changing `PATH`.
+
+To install from a local checkout instead, run this from the repository root in PowerShell:
 
 ```powershell
 Set-Location E:\dev\kotlin\com.frankgp.tools\tools\play-tool
 go install .
 ```
 
-Go coloca el ejecutable en `$(go env GOPATH)\bin` (normalmente `%USERPROFILE%\go\bin`). Agrega esa carpeta al `PATH` de Windows para invocar `play-tool` desde cualquier terminal. Después de cambiar el `PATH`, abre una terminal nueva.
+The local install also places the executable in `$(go env GOPATH)\bin`.
 
-## Configuración automática y opcional
+## Automatic and optional configuration
 
-`play-tool.json` es opcional. Sin él, `play-tool` detecta `applicationId` en `app/build.gradle.kts` o `app/build.gradle`, usa la pista `internal` y asume la salida AAB estándar `app/build/outputs/bundle/release/app-release.aab`. En React Native, esa ruta se calcula desde la carpeta `android/`.
+`play-tool.json` is optional. Without it, `play-tool` detects `applicationId` in `app/build.gradle.kts` or `app/build.gradle`, uses the `internal` track, and assumes the standard AAB output path `app/build/outputs/bundle/release/app-release.aab`. For React Native, this path is resolved from the `android/` directory.
 
-El comando `deploy` incrementa el `versionCode` numérico en cualquiera de esos dos formatos Gradle antes de compilar y subir.
+The `deploy` command increments the numeric `versionCode` in either Gradle file format before building and uploading.
 
-La clave de Google Play se indica con la variable de entorno `PLAY_TOOL_KEY` o con el campo `key` de `play-tool.json`. La variable de entorno tiene prioridad. En PowerShell, para definirla en la terminal actual:
+Set the Google Play key with the `PLAY_TOOL_KEY` environment variable or the `key` field in `play-tool.json`. The environment variable takes precedence. In PowerShell, set it for the current terminal session with:
 
 ```powershell
 $env:PLAY_TOOL_KEY = "E:\dev\android\play-service-account.json"
 ```
 
-Si prefieres configurar la clave por proyecto, crea un `play-tool.json` mínimo en la raíz Gradle o en la raíz React Native (donde está `package.json`):
+To configure the key per project, create a minimal `play-tool.json` in the Gradle root or React Native root (where `package.json` is located):
 
 ```json
 {
@@ -33,65 +41,79 @@ Si prefieres configurar la clave por proyecto, crea un `play-tool.json` mínimo 
 }
 ```
 
-El JSON puede sobrescribir `package`, `track`, `aab`, `apkDebug`, `apkRelease`, `key` y `gradleRoot`. Sus rutas relativas se resuelven desde la carpeta donde está el JSON; la ruta relativa de `PLAY_TOOL_KEY` se resuelve desde la raíz Gradle. Si `applicationId` no está escrito como literal en `app/build.gradle.kts` o `app/build.gradle`, configura `package` manualmente. Para proyectos con flavors, configura las rutas y el paquete de la variante que publiques. No subas credenciales al repositorio.
+The JSON can override `package`, `track`, `aab`, `apkDebug`, `apkRelease`, `key`, and `gradleRoot`. Its relative paths are resolved from the directory containing the JSON; the relative path in `PLAY_TOOL_KEY` is resolved from the Gradle root. If `applicationId` is not written as a literal in `app/build.gradle.kts` or `app/build.gradle`, set `package` manually. For projects with flavors, configure the paths and package for the variant you publish. Do not commit credentials to the repository.
 
-Para inspeccionar metadatos de un AAB, instala `bundletool-all.jar` por tu cuenta e indica su ruta en la sesión de PowerShell:
+To inspect AAB metadata, obtain `bundletool-all.jar` and set its path in your PowerShell session:
 
 ```powershell
-$env:BUNDLETOOL_JAR = "E:\tools\bundletool-all.jar"
+$env:PLAY_BUNDLETOOL_JAR = "E:\tools\bundletool-all.jar"
 ```
 
-## Uso
+## Usage
 
-Consulta los comandos disponibles sin necesidad de configuración:
+List the available commands without configuring the project:
 
 ```powershell
 play-tool --help
 ```
 
-Consulta la versión sin necesidad de que exista un `play-tool.json` en la carpeta actual:
+Generate a GitHub Actions workflow in `.github/workflows/deploy-go.yml`:
+
+```powershell
+play-tool initWorkflow
+```
+
+The workflow runs `play-tool deploy` on pushes to `main` and can also be started manually. Add these repository Actions secrets:
+
+- `PLAY_SERVICE_ACCOUNT_JSON`: the Google Play service account JSON.
+- `RELEASE_KEYSTORE_BASE64`: the release keystore file encoded as Base64.
+- `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`: the Android signing credentials.
+
+The workflow writes the service account JSON to a temporary file, restores the release keystore to `app/release.keystore`, then builds and uploads the AAB.
+
+Show the version without requiring a `play-tool.json` in the current directory:
 
 ```powershell
 play-tool --version
-# play-tool 1.0.8 go1.27.0 windows/amd64
+# play-tool 1.0.9 go1.27.0 windows/amd64
 ```
 
-Desde cualquier carpeta dentro del proyecto —incluida la raíz— ejecuta el comando sin opciones de configuración:
+Run these commands from any directory inside the project, including its root, without additional configuration:
 
 ```powershell
-play-tool show
-play-tool assembleDebug
-play-tool installDebug
-play-tool assembleRelease
-play-tool installRelease
-play-tool bundleRelease
-play-tool adbInstallDebug
-play-tool adbInstallRelease
-play-tool info assembleDebug
-play-tool info assembleRelease
-play-tool info bundleRelease
-play-tool build
-play-tool build apk debug
-play-tool build apk release
-play-tool build bundle release
-play-tool install gradle release
-play-tool install apk debug
-play-tool install apk release
-play-tool verify apk debug
-play-tool verify apk release
-play-tool verify bundle
-play-tool manifest min-sdk debug
-play-tool manifest target-sdk debug
-play-tool upload
-play-tool deploy
+play-tool                              # Open the interactive menu
+play-tool show                         # Show published versions
+play-tool assembleDebug                # Build the debug APK
+play-tool assembleRelease              # Build the release APK
+play-tool bundleRelease                # Build the release AAB
+play-tool cleanBundleRelease           # Run clean and build the release AAB
+play-tool installDebug                 # Install debug with Gradle
+play-tool installRelease               # Install release with Gradle
+play-tool adbInstallDebug              # Install the existing debug APK with adb
+play-tool adbInstallRelease            # Install the existing release APK with adb
+play-tool info assembleDebug           # Inspect the existing debug APK
+play-tool info assembleRelease         # Inspect the existing release APK
+play-tool info bundleRelease           # Inspect the existing release AAB
+play-tool verify apk debug             # Verify the debug APK certificate
+play-tool verify apk release           # Verify the release APK certificate
+play-tool verify bundle                # Verify the AAB certificate
+play-tool manifest min-sdk debug       # Show minSdk for the debug APK
+play-tool manifest min-sdk release     # Show minSdk for the release APK
+play-tool manifest target-sdk debug   # Show targetSdk for the debug APK
+play-tool manifest target-sdk release  # Show targetSdk for the release APK
+play-tool upload                       # Upload the configured AAB to Google Play
+play-tool deploy                       # Update versionCode, build, and upload
+play-tool initWorkflow                # Generate the GitHub Actions deploy workflow
+play-tool --version                    # Show the play-tool, Go, and platform versions
+play-tool --help                       # Show help
 ```
 
-`build` sin argumentos conserva el comportamiento anterior (`clean bundleRelease`). `install gradle release` instala con Gradle; `install apk` instala el APK existente con `adb`. `verify` muestra el certificado del APK/AAB y `manifest` consulta minSdk o targetSdk. Las herramientas se buscan en las ubicaciones estándar de Android SDK/JDK y después en `PATH`.
+`cleanBundleRelease` runs `clean bundleRelease`. The `assembleDebug`, `assembleRelease`, and `bundleRelease` commands run the corresponding Gradle task. `installDebug` and `installRelease` install through Gradle; `adbInstallDebug` and `adbInstallRelease` install an existing APK with `adb install -r -d`. `verify` displays the APK/AAB certificate, and `manifest` reads minSdk or targetSdk. Tools are searched for in standard Android SDK/JDK locations and then on `PATH`.
 
-Los alias `assembleDebug`, `assembleRelease` y `bundleRelease` ejecutan sus tareas Gradle. `installDebug` y `installRelease` instalan mediante Gradle. Los comandos `adbInstall...` instalan un APK ya generado usando `adb install -r -d`. `info` inspecciona el artefacto ya existente, muestra paquete, versiones, minSdk/targetSdk, firma, SHA-1, SHA-256, ruta y tamaño. Para AAB, requiere `BUNDLETOOL_JAR`; muestra el certificado de carga del bundle. `compileSdk` no está incluido en el artefacto final y no se reporta.
+`info` inspects an existing artifact and displays its package, versions, minSdk/targetSdk, signature, SHA-1, SHA-256, path, and size. AAB inspection requires `PLAY_BUNDLETOOL_JAR` and displays the bundle's upload certificate. `compileSdk` is not included in the final artifact and is not reported.
 
-Los comandos muestran estados con emojis. `upload` presenta una barra porcentual basada en el progreso de carga por bloques del AAB; después indica cuándo publica y confirma la pista.
+Commands display status with emojis. `upload` shows a percentage bar based on chunked AAB upload progress, then reports when it publishes and confirms the track.
 
-Si existe, el programa encuentra el `play-tool.json` más cercano al subir desde el directorio actual y se detiene en la raíz Gradle más cercana. También puedes omitirlo si la detección automática cubre tu proyecto y `PLAY_TOOL_KEY` está configurada.
+When present, the program finds the nearest `play-tool.json` while traversing upward from the current directory and stops at the nearest Gradle root. You can omit it if automatic detection supports your project and `PLAY_TOOL_KEY` is set.
 
-Al ejecutar `play-tool` sin comando se abre el menú interactivo, agrupado en Build e instalación, Información y verificación, y Google Play. Las opciones de Deploy y publicación piden confirmación antes de ejecutarse.
+Running `play-tool` without a command opens the interactive menu, grouped into Build and install, Info and verification, and Google Play. Deploy and publishing actions ask for confirmation before running.

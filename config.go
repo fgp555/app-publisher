@@ -24,8 +24,8 @@ type Config struct {
 	ConfigPath string `json:"-"`
 }
 
-// loadConfig usa valores automáticos del proyecto Gradle y aplica las
-// sobrescrituras opcionales de play-tool.json.
+// loadConfig uses automatic values from the Gradle project and applies
+// optional overrides from play-tool.json.
 func loadConfig() (Config, error) {
 	startDir, err := os.Getwd()
 	if err != nil {
@@ -37,7 +37,7 @@ func loadConfig() (Config, error) {
 		return Config{}, err
 	}
 	if !foundProject {
-		return Config{}, fmt.Errorf("no se detectó un proyecto Android/React Native desde %s; ejecuta play-tool dentro del proyecto o su carpeta android", startDir)
+		return Config{}, fmt.Errorf("no Android/React Native project detected from %s; run play-tool inside the project or its android directory", startDir)
 	}
 
 	path, err := findConfig(startDir, projectRoot)
@@ -54,12 +54,12 @@ func loadConfig() (Config, error) {
 	if path != "" {
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return Config{}, fmt.Errorf("no se pudo leer la configuración %s: %w", path, err)
+			return Config{}, fmt.Errorf("could not read configuration %s: %w", path, err)
 		}
 
 		var overrides Config
 		if err := json.Unmarshal(data, &overrides); err != nil {
-			return Config{}, fmt.Errorf("la configuración %s no contiene JSON válido: %w", path, err)
+			return Config{}, fmt.Errorf("configuration %s does not contain valid JSON: %w", path, err)
 		}
 
 		base := filepath.Dir(path)
@@ -112,16 +112,16 @@ func loadConfig() (Config, error) {
 func readApplicationID(gradleRoot string) (string, error) {
 	path, err := findAppBuildFile(gradleRoot)
 	if err != nil {
-		return "", fmt.Errorf("%w; agrega \"package\" a %s o revisa la estructura del módulo Android", err, configName)
+		return "", fmt.Errorf("%w; add \"package\" to %s or check the Android module structure", err, configName)
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("no se pudo leer %s para detectar applicationId: %w", path, err)
+		return "", fmt.Errorf("could not read %s to detect applicationId: %w", path, err)
 	}
 	if match := applicationIDRe.FindSubmatch(data); len(match) == 2 {
 		return string(match[1]), nil
 	}
-	return "", fmt.Errorf("no se encontró un applicationId literal en %s; agrega \"package\" a %s", path, configName)
+	return "", fmt.Errorf("no literal applicationId found in %s; add \"package\" to %s", path, configName)
 }
 
 func findAppBuildFile(gradleRoot string) (string, error) {
@@ -133,15 +133,15 @@ func findAppBuildFile(gradleRoot string) (string, error) {
 		info, err := os.Stat(path)
 		if err == nil {
 			if !info.Mode().IsRegular() {
-				return "", fmt.Errorf("el archivo de configuración Gradle no es un archivo regular: %s", path)
+				return "", fmt.Errorf("Gradle configuration path is not a regular file: %s", path)
 			}
 			return path, nil
 		}
 		if !os.IsNotExist(err) {
-			return "", fmt.Errorf("no se pudo revisar el archivo Gradle %s: %w", path, err)
+			return "", fmt.Errorf("could not inspect Gradle file %s: %w", path, err)
 		}
 	}
-	return "", fmt.Errorf("no se encontró app/build.gradle.kts ni app/build.gradle en %s", gradleRoot)
+	return "", fmt.Errorf("neither app/build.gradle.kts nor app/build.gradle was found in %s", gradleRoot)
 }
 
 func resolve(base, p string) string {
@@ -159,7 +159,7 @@ func findConfig(startDir, projectRoot string) (string, error) {
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate, nil
 		} else if !os.IsNotExist(err) {
-			return "", fmt.Errorf("no se pudo revisar %s: %w", candidate, err)
+			return "", fmt.Errorf("could not inspect %s: %w", candidate, err)
 		}
 		if dir == projectRoot {
 			return "", nil
@@ -186,8 +186,8 @@ func findProjectRoots(startDir string) (gradleRoot, projectRoot string, found bo
 		return gradleRoot, projectRoot, true, nil
 	}
 
-	// Desde la raíz React Native, el wrapper Gradle está en android/ y no
-	// aparece al recorrer únicamente las carpetas padre.
+	// From the React Native root, the Gradle wrapper is in android/ and is not
+	// found by traversing only parent directories.
 	dir := startDir
 	for {
 		androidDir := filepath.Join(dir, "android")
@@ -232,7 +232,7 @@ func hasGradleMarker(dir string) (bool, error) {
 		if _, err := os.Stat(path); err == nil {
 			return true, nil
 		} else if !os.IsNotExist(err) {
-			return false, fmt.Errorf("no se pudo revisar el marcador Gradle %s: %w", path, err)
+			return false, fmt.Errorf("could not inspect Gradle marker %s: %w", path, err)
 		}
 	}
 	return false, nil

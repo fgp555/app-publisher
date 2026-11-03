@@ -40,7 +40,7 @@ func showArtifactInfo(cfg Config, target string) error {
 	case "bundleRelease":
 		info, err = inspectBundle(cfg.AAB)
 	default:
-		return fmt.Errorf("artefacto no válido %q; usa assembleDebug, assembleRelease o bundleRelease", target)
+		return fmt.Errorf("invalid artifact %q; use assembleDebug, assembleRelease, or bundleRelease", target)
 	}
 	if err != nil {
 		return err
@@ -83,13 +83,13 @@ func inspectAPK(path string) (artifactInfo, error) {
 
 	certOutput, err := captureCombinedToolOutput(apksigner, filepath.Dir(path), "verify", "--print-certs", path)
 	if err != nil {
-		return artifactInfo{}, fmt.Errorf("no se pudo verificar la firma del APK: %w", err)
+		return artifactInfo{}, fmt.Errorf("could not verify APK signature: %w", err)
 	}
-	info.Signature = "válida"
+	info.Signature = "valid"
 	info.SHA1, info.SHA256 = parseFingerprints(signerFingerprintRe, certOutput)
 	stat, err := os.Stat(path)
 	if err != nil {
-		return artifactInfo{}, fmt.Errorf("no se pudo leer el tamaño del APK: %w", err)
+		return artifactInfo{}, fmt.Errorf("could not read APK size: %w", err)
 	}
 	info.Size = stat.Size()
 	return info, nil
@@ -118,7 +118,7 @@ func inspectBundle(path string) (artifactInfo, error) {
 
 	manifest, err := captureToolOutput(java, filepath.Dir(path), "-jar", bundletool, "dump", "manifest", "--bundle="+path)
 	if err != nil {
-		return artifactInfo{}, fmt.Errorf("bundletool no pudo leer el manifiesto del AAB: %w", err)
+		return artifactInfo{}, fmt.Errorf("bundletool could not read the AAB manifest: %w", err)
 	}
 	info := artifactInfo{Path: path}
 	if err := readBundleManifest(manifest, &info); err != nil {
@@ -126,16 +126,16 @@ func inspectBundle(path string) (artifactInfo, error) {
 	}
 	certOutput, err := captureToolOutput(keytool, filepath.Dir(path), "-printcert", "-jarfile", path)
 	if err != nil {
-		return artifactInfo{}, fmt.Errorf("no se pudo leer el certificado del AAB: %w", err)
+		return artifactInfo{}, fmt.Errorf("could not read AAB certificate: %w", err)
 	}
 	info.SHA1, info.SHA256 = parseFingerprints(keytoolFingerprintRe, certOutput)
 	if _, err := captureToolOutput(jarsigner, filepath.Dir(path), "-verify", path); err != nil {
-		return artifactInfo{}, fmt.Errorf("no se pudo verificar la firma JAR del AAB: %w", err)
+		return artifactInfo{}, fmt.Errorf("could not verify AAB JAR signature: %w", err)
 	}
-	info.Signature = "válida (certificado de carga)"
+	info.Signature = "valid (upload certificate)"
 	stat, err := os.Stat(path)
 	if err != nil {
-		return artifactInfo{}, fmt.Errorf("no se pudo leer el tamaño del AAB: %w", err)
+		return artifactInfo{}, fmt.Errorf("could not read AAB size: %w", err)
 	}
 	info.Size = stat.Size()
 	return info, nil
@@ -149,7 +149,7 @@ func readBundleManifest(data []byte, info *artifactInfo) error {
 			if err == io.EOF {
 				break
 			}
-			return fmt.Errorf("bundletool devolvió un manifiesto AAB inválido: %w", err)
+			return fmt.Errorf("bundletool returned an invalid AAB manifest: %w", err)
 		}
 		start, ok := token.(xml.StartElement)
 		if !ok {
@@ -195,14 +195,14 @@ func parseFingerprints(re *regexp.Regexp, output []byte) (sha1, sha256 string) {
 }
 
 func printArtifactInfo(info artifactInfo, variant string) {
-	fmt.Printf("\n📦 Artefacto: %s (%s)\n", variant, formatBytes(info.Size))
-	fmt.Printf("📍 Archivo:   %s\n", info.Path)
-	fmt.Printf("📱 Paquete:   %s\n", valueOrUnknown(info.Package))
+	fmt.Printf("\n📦 Artifact: %s (%s)\n", variant, formatBytes(info.Size))
+	fmt.Printf("📍 File:      %s\n", info.Path)
+	fmt.Printf("📱 Package:   %s\n", valueOrUnknown(info.Package))
 	fmt.Printf("🔢 versionCode: %s\n", valueOrUnknown(info.VersionCode))
 	fmt.Printf("🏷️  versionName: %s\n", valueOrUnknown(info.VersionName))
 	fmt.Printf("🤖 minSdk:      %s\n", valueOrUnknown(info.MinSDK))
 	fmt.Printf("🎯 targetSdk:   %s\n", valueOrUnknown(info.TargetSDK))
-	fmt.Printf("🛡️  Firma:      %s\n", valueOrUnknown(info.Signature))
+	fmt.Printf("🛡️  Signature:  %s\n", valueOrUnknown(info.Signature))
 	fmt.Printf("🔐 SHA-1:       %s\n", formatFingerprint(info.SHA1))
 	fmt.Printf("🔐 SHA-256:     %s\n", formatFingerprint(info.SHA256))
 }
@@ -257,16 +257,16 @@ func captureCombinedToolOutput(path, dir string, args ...string) ([]byte, error)
 }
 
 func resolveBundletoolJar() (string, error) {
-	path := strings.TrimSpace(os.Getenv("BUNDLETOOL_JAR"))
+	path := strings.TrimSpace(os.Getenv("PLAY_BUNDLETOOL_JAR"))
 	if path == "" {
-		return "", fmt.Errorf("para inspeccionar AAB, descarga bundletool-all.jar desde %s y configura BUNDLETOOL_JAR con su ruta", bundletoolReleasesURL)
+		return "", fmt.Errorf("to inspect an AAB, download bundletool-all.jar from %s and set PLAY_BUNDLETOOL_JAR to its path", bundletoolReleasesURL)
 	}
 	if err := requireFile(path, "bundletool JAR"); err != nil {
 		return "", err
 	}
 	absolute, err := filepath.Abs(path)
 	if err != nil {
-		return "", fmt.Errorf("no se pudo resolver la ruta de BUNDLETOOL_JAR %s: %w", path, err)
+		return "", fmt.Errorf("could not resolve PLAY_BUNDLETOOL_JAR path %s: %w", path, err)
 	}
 	return absolute, nil
 }
@@ -280,6 +280,6 @@ func resolveJDKTool(name string) (string, error) {
 	if path, err := lookPath(name); err == nil {
 		return path, nil
 	}
-	return "", fmt.Errorf("no se encontró %s; revisa JAVA_HOME o agrega el JDK al PATH", name)
+	return "", fmt.Errorf("%s not found; check JAVA_HOME or add the JDK to PATH", name)
 }
 
