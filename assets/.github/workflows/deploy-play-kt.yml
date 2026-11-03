@@ -3,7 +3,7 @@ name: Deploy Android app to Google Play
 on:
   push:
     branches:
-      - main
+      - deploy
   workflow_dispatch:
 
 permissions:
@@ -42,7 +42,8 @@ jobs:
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
-          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+          key_file="$RUNNER_TEMP/release.keystore"
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$key_file"
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
@@ -51,6 +52,7 @@ jobs:
         run: play-tool deploy
         env:
           PLAY_TOOL_KEY: ${{ runner.temp }}/play-service-account.json
+          KEYSTORE_FILE: ${{ runner.temp }}/release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}

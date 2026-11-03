@@ -13,7 +13,7 @@ const kotlinDeployWorkflow = `name: Deploy Android app to Google Play
 on:
   push:
     branches:
-      - main
+      - deploy
   workflow_dispatch:
 
 permissions:
@@ -52,7 +52,8 @@ jobs:
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
-          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+          key_file="$RUNNER_TEMP/release.keystore"
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$key_file"
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
@@ -61,17 +62,58 @@ jobs:
         run: play-tool deploy
         env:
           PLAY_TOOL_KEY: ${{ runner.temp }}/play-service-account.json
+          KEYSTORE_FILE: ${{ runner.temp }}/release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 `
+
+const kotlinReleaseSigningMarker = "// play-tool: release signing from local.properties or environment"
+const kotlinPropertiesImport = "import java.util.Properties"
+
+const kotlinReleaseSigningConfig = `// play-tool: release signing from local.properties or environment
+val playToolLocalProperties = Properties()
+val playToolLocalPropertiesFile = rootProject.file("local.properties")
+if (playToolLocalPropertiesFile.exists()) {
+    playToolLocalPropertiesFile.inputStream().use { playToolLocalProperties.load(it) }
+}
+fun playToolSigningValue(name: String): String? =
+    System.getenv(name)?.takeIf { it.isNotBlank() }
+        ?: playToolLocalProperties.getProperty(name)?.takeIf { it.isNotBlank() }
+
+val playToolKeystoreFile = playToolSigningValue("KEYSTORE_FILE")
+if (!playToolKeystoreFile.isNullOrBlank()) {
+    android {
+        signingConfigs {
+            create("playToolRelease") {
+                storeFile = file(playToolKeystoreFile)
+                storePassword = playToolSigningValue("KEYSTORE_PASSWORD")
+                keyAlias = playToolSigningValue("KEY_ALIAS")
+                keyPassword = playToolSigningValue("KEY_PASSWORD")
+            }
+        }
+        buildTypes {
+            getByName("release") {
+                signingConfig = signingConfigs.getByName("playToolRelease")
+            }
+        }
+    }
+}
+`
+
+type generatedPlayToolConfig struct {
+	Package string `json:"package,omitempty"`
+	Track   string `json:"track"`
+	AAB     string `json:"aab"`
+	Key     string `json:"key"`
+}
 
 const reactNativeDeployWorkflow = `name: Deploy React Native app to Google Play
 
 on:
   push:
     branches:
-      - main
+      - deploy
   workflow_dispatch:
 
 permissions:
@@ -185,11 +227,40 @@ func initWorkflow(profile string) error {
 	}
 
 	workflowPath := filepath.Join(projectRoot, ".github", "workflows", "deploy-play.yml")
+	playToolConfigPath := filepath.Join(projectRoot, configName)
 	switch profile {
 	case "kt":
+		gradlePath := filepath.Join(projectRoot, "app", "build.gradle.kts")
+		configContents, err := generatePlayToolConfig(profile, projectRoot)
+		if err != nil {
+			return err
+		}
+		updatedGradle, gradleChanged, err := addKotlinReleaseSigning(gradlePath)
+		if err != nil {
+			return err
+		}
+		if gradleChanged {
+			info, err := os.Stat(gradlePath)
+			if err != nil {
+				return fmt.Errorf("could not inspect %s: %w", gradlePath, err)
+			}
+			if err := os.WriteFile(gradlePath, updatedGradle, info.Mode().Perm()); err != nil {
+				return fmt.Errorf("could not update Kotlin Gradle config %s: %w", gradlePath, err)
+			}
+			fmt.Printf("✅ Configured release signing in %s\n", gradlePath)
+		} else {
+			fmt.Printf("ℹ️  Release signing is already configured in %s\n", gradlePath)
+		}
+		if err := writeIfMissing(playToolConfigPath, configContents); err != nil {
+			return err
+		}
 		return writeIfMissing(workflowPath, kotlinDeployWorkflow)
 	case "rn":
 		appJSONPath := filepath.Join(projectRoot, "app.json")
+		configContents, err := generatePlayToolConfig(profile, projectRoot)
+		if err != nil {
+			return err
+		}
 		updatedAppJSON, appJSONChanged, err := addExpoPlugin(appJSONPath, "./plugins/withAndroidReleaseSigning")
 		if err != nil {
 			return err
@@ -200,6 +271,9 @@ func initWorkflow(profile string) error {
 			return err
 		}
 		if err := writeIfMissing(workflowPath, reactNativeDeployWorkflow); err != nil {
+			return err
+		}
+		if err := writeIfMissing(playToolConfigPath, configContents); err != nil {
 			return err
 		}
 		if appJSONChanged {
@@ -214,6 +288,125 @@ func initWorkflow(profile string) error {
 	default:
 		return fmt.Errorf("unknown workflow profile %q; use kt or rn", profile)
 	}
+}
+
+func detectWorkflowProfile() (string, error) {
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("could not get current directory: %w", err)
+	}
+
+	packageJSONPath := filepath.Join(projectRoot, "package.json")
+	appJSONPath := filepath.Join(projectRoot, "app.json")
+	if fileExists(packageJSONPath) && fileExists(appJSONPath) {
+		data, err := os.ReadFile(appJSONPath)
+		if err != nil {
+			return "", fmt.Errorf("could not read Expo config %s: %w", appJSONPath, err)
+		}
+		var config struct {
+			Expo json.RawMessage `json:"expo"`
+		}
+		if err := json.Unmarshal(data, &config); err != nil {
+			return "", fmt.Errorf("app.json is not valid JSON: %w", err)
+		}
+		if len(config.Expo) > 0 {
+			return "rn", nil
+		}
+	}
+
+	if fileExists(filepath.Join(projectRoot, "app", "build.gradle.kts")) {
+		return "kt", nil
+	}
+	return "", fmt.Errorf("could not detect project type in %s; run play-tool init kt or play-tool init rn", projectRoot)
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular()
+}
+
+func generatePlayToolConfig(profile, projectRoot string) (string, error) {
+	config := generatedPlayToolConfig{Track: "internal", Key: ""}
+	switch profile {
+	case "kt":
+		config.AAB = filepath.ToSlash(filepath.Join("app", "build", "outputs", "bundle", "release", "app-release.aab"))
+		if packageName, err := readApplicationID(projectRoot); err == nil {
+			config.Package = packageName
+		}
+	case "rn":
+		config.AAB = filepath.ToSlash(filepath.Join("android", "app", "build", "outputs", "bundle", "release", "app-release.aab"))
+		appJSONPath := filepath.Join(projectRoot, "app.json")
+		data, err := os.ReadFile(appJSONPath)
+		if err != nil {
+			return "", fmt.Errorf("could not read Expo config %s: %w", appJSONPath, err)
+		}
+		var expoConfig struct {
+			Expo struct {
+				Android struct {
+					Package string `json:"package"`
+				} `json:"android"`
+			} `json:"expo"`
+		}
+		if err := json.Unmarshal(data, &expoConfig); err != nil {
+			return "", fmt.Errorf("Expo config %s is not valid JSON: %w", appJSONPath, err)
+		}
+		config.Package = expoConfig.Expo.Android.Package
+		if config.Package == "" {
+			if packageName, err := readApplicationID(filepath.Join(projectRoot, "android")); err == nil {
+				config.Package = packageName
+			}
+		}
+	default:
+		return "", fmt.Errorf("unknown workflow profile %q; use kt or rn", profile)
+	}
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("could not generate %s: %w", configName, err)
+	}
+	return string(data) + "\n", nil
+}
+
+func addKotlinReleaseSigning(gradlePath string) ([]byte, bool, error) {
+	data, err := os.ReadFile(gradlePath)
+	if err != nil {
+		return nil, false, fmt.Errorf("could not read Kotlin Gradle config %s: %w", gradlePath, err)
+	}
+	if !bytes.Contains(data, []byte("plugins {")) || !bytes.Contains(data, []byte("android {")) {
+		return nil, false, fmt.Errorf("%s does not look like an Android Kotlin DSL build.gradle.kts file", gradlePath)
+	}
+	updated, importAdded := ensureKotlinPropertiesImport(data)
+	if bytes.Contains(data, []byte(kotlinReleaseSigningMarker)) {
+		fixed := bytes.ReplaceAll(updated, []byte("java.util.Properties()"), []byte("Properties()"))
+		return fixed, importAdded || !bytes.Equal(fixed, data), nil
+	}
+	updated = append([]byte(nil), updated...)
+	newline := []byte("\n")
+	if bytes.Contains(data, []byte("\r\n")) {
+		newline = []byte("\r\n")
+	}
+	if len(updated) > 0 && updated[len(updated)-1] != '\n' {
+		updated = append(updated, newline...)
+	}
+	updated = append(updated, newline...)
+	config := bytes.ReplaceAll([]byte(kotlinReleaseSigningConfig), []byte("\n"), newline)
+	updated = append(updated, config...)
+	return updated, true, nil
+}
+
+func ensureKotlinPropertiesImport(data []byte) ([]byte, bool) {
+	if bytes.Contains(data, []byte(kotlinPropertiesImport)) {
+		return data, false
+	}
+	newline := []byte("\n")
+	if bytes.Contains(data, []byte("\r\n")) {
+		newline = []byte("\r\n")
+	}
+	updated := make([]byte, 0, len(data)+len(kotlinPropertiesImport)+len(newline))
+	updated = append(updated, kotlinPropertiesImport...)
+	updated = append(updated, newline...)
+	updated = append(updated, data...)
+	return updated, true
 }
 
 func writeIfMissing(path, contents string) error {

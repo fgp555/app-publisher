@@ -3,7 +3,7 @@ name: Deploy React Native app to Google Play
 on:
   push:
     branches:
-      - main
+      - deploy
   workflow_dispatch:
 
 permissions:
@@ -25,8 +25,11 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
+      - name: Generate Android native project
+        run: npx expo prebuild --platform android --no-install
+
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'

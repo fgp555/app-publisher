@@ -22,7 +22,7 @@ func main() {
 		printHelp()
 		return
 	}
-	if len(os.Args) > 1 && os.Args[1] == "initWorkflow" {
+	if len(os.Args) > 1 && os.Args[1] == "init" {
 		if err := runCI(Config{}, os.Args[1:]); err != nil {
 			fmt.Println("❌ Error:", err)
 			os.Exit(1)
@@ -186,6 +186,9 @@ func printHelp() {
 
 Usage:
   play-tool
+  play-tool init
+  play-tool init kt
+  play-tool init rn
   play-tool show
   play-tool assembleDebug
   play-tool assembleRelease
@@ -207,8 +210,6 @@ Usage:
   play-tool manifest target-sdk release
   play-tool upload
   play-tool deploy
-  play-tool initWorkflow kt
-  play-tool initWorkflow rn
   play-tool --version
   play-tool --help
 
@@ -244,6 +245,9 @@ func confirm(question string) bool {
 // build runs Gradle from the project directory defined in play-tool.json.
 func build(cfg Config) error {
 	fmt.Println("🛠️  Building release AAB...")
+	if filepath.Base(cfg.GradleRoot) == "android" && isRegularFile(filepath.Join(filepath.Dir(cfg.GradleRoot), "package.json")) {
+		return runGradleTasks(cfg, "bundleRelease")
+	}
 	return runGradleTasks(cfg, "clean", "bundleRelease")
 }
 

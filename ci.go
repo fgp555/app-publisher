@@ -12,11 +12,19 @@ func runCI(cfg Config, args []string) error {
 	}
 
 	switch args[0] {
-	case "initWorkflow":
-		if len(args) != 2 {
-			return fmt.Errorf("usage: play-tool initWorkflow kt|rn")
+	case "init":
+		if len(args) == 1 {
+			profile, err := detectWorkflowProfile()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("🔎 Detected %s project\n", profile)
+			return initWorkflow(profile)
 		}
-		return initWorkflow(args[1])
+		if len(args) == 2 {
+			return initWorkflow(args[1])
+		}
+		return fmt.Errorf("usage: play-tool init [kt|rn]")
 
 	case "assembleDebug", "assembleRelease", "bundleRelease", "installDebug", "installRelease":
 		if err := requireArgs(args, 1, args[0]); err != nil {
