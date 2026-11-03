@@ -57,19 +57,27 @@ List the available commands without configuring the project:
 play-tool --help
 ```
 
-Generate a GitHub Actions workflow in `.github/workflows/deploy-go.yml`:
+Run from the project root to generate a GitHub Actions workflow in `.github/workflows/deploy-play.yml` for a Kotlin Android project:
 
 ```powershell
-play-tool initWorkflow
+play-tool initWorkflow kt
 ```
 
-The workflow runs `play-tool deploy` on pushes to `main` and can also be started manually. Add these repository Actions secrets:
+For a React Native project with `package-lock.json`, generate the React Native workflow and release signing config plugin:
+
+```powershell
+play-tool initWorkflow rn
+```
+
+The React Native command creates `plugins/withAndroidReleaseSigning.js` and registers it in `app.json`. It works with Expo Continuous Native Generation: the workflow runs Prebuild to generate `android/` before Gradle setup. Both workflows run `play-tool deploy` on pushes to `main` and can also be started manually. Add these repository Actions secrets:
 
 - `PLAY_SERVICE_ACCOUNT_JSON`: the Google Play service account JSON.
 - `RELEASE_KEYSTORE_BASE64`: the release keystore file encoded as Base64.
 - `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`: the Android signing credentials.
 
-The workflow writes the service account JSON to a temporary file, restores the release keystore to `app/release.keystore`, then builds and uploads the AAB.
+The workflows write the service account JSON to a temporary file and restore the release keystore before building and uploading the AAB. The React Native workflow also sets up Node.js 22, runs `npm ci`, and runs `npx expo prebuild --platform android --no-install`.
+
+The React Native plugin configures the generated Gradle release signing to use `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`. It only applies this signing config when `KEYSTORE_FILE` is set, so local debug builds keep their existing configuration. Existing workflow and plugin files are left unchanged; `app.json` is updated only to register the plugin when needed.
 
 Show the version without requiring a `play-tool.json` in the current directory:
 
@@ -103,7 +111,8 @@ play-tool manifest target-sdk debug   # Show targetSdk for the debug APK
 play-tool manifest target-sdk release  # Show targetSdk for the release APK
 play-tool upload                       # Upload the configured AAB to Google Play
 play-tool deploy                       # Update versionCode, build, and upload
-play-tool initWorkflow                # Generate the GitHub Actions deploy workflow
+play-tool initWorkflow kt             # Generate the Kotlin Android deploy workflow
+play-tool initWorkflow rn             # Generate the React Native deploy workflow
 play-tool --version                    # Show the play-tool, Go, and platform versions
 play-tool --help                       # Show help
 ```

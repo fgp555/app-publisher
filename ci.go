@@ -13,10 +13,10 @@ func runCI(cfg Config, args []string) error {
 
 	switch args[0] {
 	case "initWorkflow":
-		if err := requireArgs(args, 1, "initWorkflow"); err != nil {
-			return err
+		if len(args) != 2 {
+			return fmt.Errorf("usage: play-tool initWorkflow kt|rn")
 		}
-		return initWorkflow()
+		return initWorkflow(args[1])
 
 	case "assembleDebug", "assembleRelease", "bundleRelease", "installDebug", "installRelease":
 		if err := requireArgs(args, 1, args[0]); err != nil {
@@ -134,7 +134,7 @@ func verifyArtifact(cfg Config, args []string) error {
 		if err != nil {
 			return err
 		}
-			fmt.Println("🔏 Verifying AAB certificate...")
+		fmt.Println("🔏 Verifying AAB certificate...")
 		return runTool(keytool, cfg.GradleRoot, "-printcert", "-jarfile", cfg.AAB)
 	}
 	if len(args) != 2 {

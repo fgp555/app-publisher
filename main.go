@@ -22,6 +22,13 @@ func main() {
 		printHelp()
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "initWorkflow" {
+		if err := runCI(Config{}, os.Args[1:]); err != nil {
+			fmt.Println("❌ Error:", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -200,7 +207,8 @@ Usage:
   play-tool manifest target-sdk release
   play-tool upload
   play-tool deploy
-  play-tool initWorkflow
+  play-tool initWorkflow kt
+  play-tool initWorkflow rn
   play-tool --version
   play-tool --help
 
