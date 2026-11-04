@@ -2,7 +2,7 @@
 
 `app-publisher` lets you inspect and publish native Android and React Native apps on Google Play. It detects the Gradle wrapper for building and uploading, and identifies a React Native project root using `package.json` and `android/`.
 
-## Installation on Windows
+## Install on Windows
 
 If Go is not installed, install it with WinGet:
 
@@ -23,13 +23,7 @@ app-publisher --help
 
 Go installs the executable in `$(go env GOPATH)/bin` (usually `%USERPROFILE%/go/bin` on Windows). Add that directory to your `PATH` to run `app-publisher` from any terminal. Open a new terminal after changing `PATH`.
 
-To install from a local checkout instead, run this from the repository root in PowerShell:
-
-```powershell
-go install .
-```
-
-The local install also places the executable in `$(go env GOPATH)\bin`.
+To build or install app-publisher from a local source checkout, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Automatic and optional configuration
 
@@ -49,10 +43,33 @@ An API service account is required for `app-publisher upload` and `app-publisher
 
 Google Play may take 24–48 hours to activate the service account permissions.
 
+## Generate a release keystore
+
+The following Bash commands generate and inspect a PKCS12 keystore, then encode it as Base64 for the `RELEASE_KEYSTORE_BASE64` GitHub Actions secret. Run them in Bash, Git Bash, WSL, or Linux with `keytool` and `base64` available:
+
+```bash
+# Generate a PKCS12 keystore (.p12 / .pfx)
+keytool -genkeypair -v -storetype PKCS12 \
+  -keystore upload.keystore \
+  -storepass "tutorial123" -alias tutorial123 -keypass "tutorial123" \
+  -dname "CN=Frank GP, OU=Development, O=Frank GP Dev, L=Puno, ST=Puno, C=PE" \
+  -keyalg RSA -keysize 2048 -validity 10000
+
+# Encode it for the GitHub Actions secret
+base64 upload.keystore > keystore.base64.txt
+
+KEYSTORE_FILE=C:/path/to/upload.keystore
+KEYSTORE_PASSWORD=tutorial123
+KEY_ALIAS=tutorial123
+KEY_PASSWORD=tutorial123
+```
+
+`tutorial123` and the identity values above are examples only. Use unique, strong passwords and your own certificate details for a real release. Keep the keystore and `keystore.base64.txt` outside Git; the Base64 file contains the keystore's secret data.
+
 Set the Google Play key with the `APP_PUBLISHER_KEY` environment variable or the `key` field in `app-publisher.json`. The environment variable takes precedence. In PowerShell, set it for the current terminal session with:
 
 ```powershell
-$env:APP_PUBLISHER_KEY = "E:\dev\android\play-service-account.json"
+$env:APP_PUBLISHER_KEY = "C:\path\to\play-service-account.json"
 ```
 
 `app-publisher init` generates `app-publisher.json` with the detected package (when available), the `internal` track, the standard AAB path, and an empty `key` field. Edit it to match your project. For example, a Kotlin Android project can use:
@@ -86,7 +103,7 @@ You can create multiple closed testing tracks, each with its own custom name, so
 To inspect AAB metadata, obtain `bundletool-all.jar` and set its path in your PowerShell session:
 
 ```powershell
-$env:APP_BUNDLETOOL_JAR = "E:\tools\bundletool-all.jar"
+$env:APP_BUNDLETOOL_JAR = "C:\path\to\bundletool-all.jar"
 ```
 
 ## Usage
@@ -114,10 +131,10 @@ app-publisher init kt
 For Kotlin DSL projects, this adds a release `signingConfig` to `app/build.gradle.kts`. If it detects an existing release signing configuration, it leaves the Gradle file unchanged and warns you. Comment out the existing `signingConfig = signingConfigs.getByName("release")` line inside `buildTypes.release`, then run `app-publisher init kt` again to add workflow signing. Locally, the generated configuration reads signing values from the project's ignored `local.properties`; environment variables override those values. Add these lines to `local.properties` (keep any existing Android SDK settings):
 
 ```properties
-KEYSTORE_FILE=E:/path/to/upload.keystore
-KEYSTORE_PASSWORD=<keystore password>
-KEY_ALIAS=<key alias>
-KEY_PASSWORD=<key password>
+KEYSTORE_FILE=C:/path/to/upload.keystore
+KEYSTORE_PASSWORD=tutorial123
+KEY_ALIAS=tutorial123
+KEY_PASSWORD=tutorial123
 ```
 
 Keep `local.properties` and the keystore out of Git. The generated GitHub Actions workflow restores `RELEASE_KEYSTORE_BASE64` to the runner's temporary directory and supplies the same signing variables through the environment during deployment.
@@ -143,10 +160,10 @@ The React Native plugin configures the generated Gradle release signing to use `
 For local React Native signing, put the credentials in `.env.local` at the project root:
 
 ```dotenv
-KEYSTORE_FILE=E:/path/to/upload.keystore
-KEYSTORE_PASSWORD=<keystore password>
-KEY_ALIAS=<key alias>
-KEY_PASSWORD=<key password>
+KEYSTORE_FILE=C:/path/to/upload.keystore
+KEYSTORE_PASSWORD=tutorial123
+KEY_ALIAS=tutorial123
+KEY_PASSWORD=tutorial123
 ```
 
 The config plugin copies these values into `android/local.properties` each time Expo Prebuild runs, preserving other properties such as `sdk.dir`. The generated Gradle signing config reads `android/local.properties`; environment variables take precedence. Expo's `.env*.local` ignore rule keeps `.env.local` out of Git. Run `npx expo prebuild --platform android --no-install` after changing `.env.local` so the generated Android project receives the updated values. Keep the keystore and local signing files out of Git.
@@ -155,7 +172,6 @@ Show the version without requiring an `app-publisher.json` in the current direct
 
 ```powershell
 app-publisher --version
-# app-publisher 1.0.9 go1.27.0 windows/amd64
 ```
 
 Run these commands from any directory inside the project, including its root, without additional configuration:
