@@ -257,16 +257,16 @@ func captureCombinedToolOutput(path, dir string, args ...string) ([]byte, error)
 }
 
 func resolveBundletoolJar() (string, error) {
-	path := strings.TrimSpace(os.Getenv("PLAY_BUNDLETOOL_JAR"))
+	path := strings.TrimSpace(os.Getenv("APP_BUNDLETOOL_JAR"))
 	if path == "" {
-		return "", fmt.Errorf("to inspect an AAB, download bundletool-all.jar from %s and set PLAY_BUNDLETOOL_JAR to its path", bundletoolReleasesURL)
+		return "", fmt.Errorf("to inspect an AAB, download bundletool-all.jar from %s and set APP_BUNDLETOOL_JAR to its path", bundletoolReleasesURL)
 	}
 	if err := requireFile(path, "bundletool JAR"); err != nil {
 		return "", err
 	}
 	absolute, err := filepath.Abs(path)
 	if err != nil {
-		return "", fmt.Errorf("could not resolve PLAY_BUNDLETOOL_JAR path %s: %w", path, err)
+		return "", fmt.Errorf("could not resolve APP_BUNDLETOOL_JAR path %s: %w", path, err)
 	}
 	return absolute, nil
 }

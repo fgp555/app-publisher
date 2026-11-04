@@ -1,4 +1,4 @@
-module github.com/fgp555/play-tool
+module github.com/fgp555/app-publisher
 
 go 1.26.8
 

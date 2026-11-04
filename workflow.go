@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"regexp"
 )
 
 const kotlinDeployWorkflow = `name: Deploy Android app to Google Play
@@ -38,8 +40,8 @@ jobs:
         with:
           go-version: '1.27.0'
 
-      - name: Install play-tool
-        run: go install github.com/fgp555/play-tool@latest
+      - name: Install app-publisher
+        run: go install github.com/fgp555/app-publisher@latest
 
       - name: Create service account JSON from secret
         env:
@@ -59,49 +61,51 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build and publish
-        run: play-tool deploy
+        run: app-publisher deploy
         env:
-          PLAY_TOOL_KEY: ${{ runner.temp }}/play-service-account.json
+          APP_PUBLISHER_KEY: ${{ runner.temp }}/play-service-account.json
           KEYSTORE_FILE: ${{ runner.temp }}/release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 `
 
-const kotlinReleaseSigningMarker = "// play-tool: release signing from local.properties or environment"
+const kotlinReleaseSigningMarker = "// app-publisher: release signing from local.properties or environment"
 const kotlinPropertiesImport = "import java.util.Properties"
+var kotlinReleaseSigningConfigPattern = regexp.MustCompile(`(?s)\bbuildTypes\s*\{.*?\brelease\s*\{.*?\bsigningConfig\s*(?:=|:)`)
+var kotlinCommentPattern = regexp.MustCompile(`(?s)/\*.*?\*/|//[^\r\n]*`)
 
-const kotlinReleaseSigningConfig = `// play-tool: release signing from local.properties or environment
-val playToolLocalProperties = Properties()
-val playToolLocalPropertiesFile = rootProject.file("local.properties")
-if (playToolLocalPropertiesFile.exists()) {
-    playToolLocalPropertiesFile.inputStream().use { playToolLocalProperties.load(it) }
+const kotlinReleaseSigningConfig = `// app-publisher: release signing from local.properties or environment
+val appPublisherLocalProperties = Properties()
+val appPublisherLocalPropertiesFile = rootProject.file("local.properties")
+if (appPublisherLocalPropertiesFile.exists()) {
+    appPublisherLocalPropertiesFile.inputStream().use { appPublisherLocalProperties.load(it) }
 }
-fun playToolSigningValue(name: String): String? =
+fun appPublisherSigningValue(name: String): String? =
     System.getenv(name)?.takeIf { it.isNotBlank() }
-        ?: playToolLocalProperties.getProperty(name)?.takeIf { it.isNotBlank() }
+        ?: appPublisherLocalProperties.getProperty(name)?.takeIf { it.isNotBlank() }
 
-val playToolKeystoreFile = playToolSigningValue("KEYSTORE_FILE")
-if (!playToolKeystoreFile.isNullOrBlank()) {
+val appPublisherKeystoreFile = appPublisherSigningValue("KEYSTORE_FILE")
+if (!appPublisherKeystoreFile.isNullOrBlank()) {
     android {
         signingConfigs {
-            create("playToolRelease") {
-                storeFile = file(playToolKeystoreFile)
-                storePassword = playToolSigningValue("KEYSTORE_PASSWORD")
-                keyAlias = playToolSigningValue("KEY_ALIAS")
-                keyPassword = playToolSigningValue("KEY_PASSWORD")
+            create("appPublisherRelease") {
+                storeFile = file(appPublisherKeystoreFile)
+                storePassword = appPublisherSigningValue("KEYSTORE_PASSWORD")
+                keyAlias = appPublisherSigningValue("KEY_ALIAS")
+                keyPassword = appPublisherSigningValue("KEY_PASSWORD")
             }
         }
         buildTypes {
             getByName("release") {
-                signingConfig = signingConfigs.getByName("playToolRelease")
+                signingConfig = signingConfigs.getByName("appPublisherRelease")
             }
         }
     }
 }
 `
 
-type generatedPlayToolConfig struct {
+type generatedAppPublisherConfig struct {
 	Package string `json:"package,omitempty"`
 	Track   string `json:"track"`
 	AAB     string `json:"aab"`
@@ -153,8 +157,8 @@ jobs:
         with:
           go-version: '1.27.0'
 
-      - name: Install play-tool
-        run: go install github.com/fgp555/play-tool@latest
+      - name: Install app-publisher
+        run: go install github.com/fgp555/app-publisher@latest
 
       - name: Create service account JSON from secret
         env:
@@ -173,18 +177,18 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Build and publish
-        run: play-tool deploy
+        run: app-publisher deploy
         env:
-          PLAY_TOOL_KEY: ${{ runner.temp }}/play-service-account.json
+          APP_PUBLISHER_KEY: ${{ runner.temp }}/play-service-account.json
           KEYSTORE_FILE: ${{ github.workspace }}/android/app/release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 `
 
-const androidReleaseSigningPlugin = `const { withAppBuildGradle } = require("expo/config-plugins");
+const previousAndroidReleaseSigningPlugin = `const { withAppBuildGradle } = require("expo/config-plugins");
 
-const marker = "// Configure release signing from play-tool environment variables";
+const marker = "// Configure release signing from app-publisher environment variables";
 
 module.exports = function withAndroidReleaseSigning(config) {
   return withAppBuildGradle(config, (config) => {
@@ -193,12 +197,12 @@ module.exports = function withAndroidReleaseSigning(config) {
     if (!contents.includes(marker)) {
       const signingBlock = [
         marker,
-        'def playToolKeystoreFile = System.getenv("KEYSTORE_FILE")',
-        'if (playToolKeystoreFile) {',
+        'def appPublisherKeystoreFile = System.getenv("KEYSTORE_FILE")',
+        'if (appPublisherKeystoreFile) {',
         '    android {',
         '        signingConfigs {',
-        '            playToolRelease {',
-        '                storeFile file(playToolKeystoreFile)',
+        '            appPublisherRelease {',
+        '                storeFile file(appPublisherKeystoreFile)',
         '                storePassword System.getenv("KEYSTORE_PASSWORD")',
         '                keyAlias System.getenv("KEY_ALIAS")',
         '                keyPassword System.getenv("KEY_PASSWORD")',
@@ -206,7 +210,117 @@ module.exports = function withAndroidReleaseSigning(config) {
         '        }',
         '        buildTypes {',
         '            release {',
-        '                signingConfig signingConfigs.playToolRelease',
+        '                signingConfig signingConfigs.appPublisherRelease',
+        '            }',
+        '        }',
+        '    }',
+        '}',
+      ].join("\n");
+      config.modResults.contents = contents.trimEnd() + "\n\n" + signingBlock + "\n";
+    }
+
+    return config;
+  });
+};
+`
+
+const androidReleaseSigningPlugin = `const { withAppBuildGradle, withDangerousMod } = require("expo/config-plugins");
+const fs = require("fs");
+const path = require("path");
+
+const marker = "// Configure release signing from app-publisher environment variables";
+const signingKeys = ["KEYSTORE_FILE", "KEYSTORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD"];
+
+function readLocalSigningValues(projectRoot) {
+  const envFile = path.join(projectRoot, ".env.local");
+  if (!fs.existsSync(envFile)) return {};
+
+  const values = {};
+  const contents = fs.readFileSync(envFile, "utf8");
+  for (const line of contents.split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:export\s+)?(KEYSTORE_FILE|KEYSTORE_PASSWORD|KEY_ALIAS|KEY_PASSWORD)\s*=\s*(.*)\s*$/);
+    if (!match) continue;
+
+    let value = match[2].trim();
+    if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    } else {
+      value = value.replace(/\s+#.*$/, "").trim();
+    }
+    values[match[1]] = value;
+  }
+  return values;
+}
+
+function escapePropertyValue(value) {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\t/g, "\\t")
+    .replace(/\r/g, "\\r")
+    .replace(/\n/g, "\\n")
+    .replace(/([:=#!])/g, "\\$1")
+    .replace(/^ /, "\\ ")
+    .replace(/[^\x20-\x7E]/g, (character) => "\\u" + character.charCodeAt(0).toString(16).padStart(4, "0"));
+}
+
+function withLocalSigningProperties(config) {
+  return withDangerousMod(config, ["android", async (config) => {
+    const projectRoot = config.modRequest.projectRoot;
+    const androidRoot = config.modRequest.platformProjectRoot;
+    const localValues = readLocalSigningValues(projectRoot);
+    const values = {};
+
+    for (const key of signingKeys) {
+      const value = process.env[key] || localValues[key];
+      if (value) values[key] = key === "KEYSTORE_FILE" ? value.replace(/\\/g, "/") : value;
+    }
+
+    if (Object.keys(values).length === 0) return config;
+
+    const propertiesPath = path.join(androidRoot, "local.properties");
+    let contents = "";
+    if (fs.existsSync(propertiesPath)) contents = fs.readFileSync(propertiesPath, "utf8");
+    const newline = contents.includes("\r\n") ? "\r\n" : "\n";
+    const updatedLines = contents.split(/\r?\n/).filter((line) =>
+      !signingKeys.some((key) => new RegExp("^\\s*" + key + "\\s*(?:=|:|\\s)").test(line))
+    );
+    while (updatedLines.length && updatedLines[updatedLines.length - 1] === "") updatedLines.pop();
+    for (const key of signingKeys) {
+      if (values[key]) updatedLines.push(key + "=" + escapePropertyValue(values[key]));
+    }
+
+    await fs.promises.mkdir(androidRoot, { recursive: true });
+    fs.writeFileSync(propertiesPath, updatedLines.join(newline) + newline, "utf8");
+    return config;
+  }]);
+}
+
+module.exports = function withAndroidReleaseSigning(config) {
+  config = withLocalSigningProperties(config);
+  return withAppBuildGradle(config, (config) => {
+    const contents = config.modResults.contents;
+
+    if (!contents.includes(marker)) {
+      const signingBlock = [
+        marker,
+        'def appPublisherLocalProperties = new java.util.Properties()',
+        'def appPublisherLocalPropertiesFile = rootProject.file("local.properties")',
+        'if (appPublisherLocalPropertiesFile.exists()) { appPublisherLocalPropertiesFile.withInputStream { appPublisherLocalProperties.load(it) } }',
+        'def appPublisherSigningValue = { name -> System.getenv(name) ?: appPublisherLocalProperties.getProperty(name) }',
+        'def appPublisherKeystoreFile = appPublisherSigningValue("KEYSTORE_FILE")',
+        'if (appPublisherKeystoreFile) {',
+        '    android {',
+        '        signingConfigs {',
+        '            appPublisherRelease {',
+        '                storeFile file(appPublisherKeystoreFile)',
+        '                storePassword appPublisherSigningValue("KEYSTORE_PASSWORD")',
+        '                keyAlias appPublisherSigningValue("KEY_ALIAS")',
+        '                keyPassword appPublisherSigningValue("KEY_PASSWORD")',
+        '            }',
+        '        }',
+        '        buildTypes {',
+        '            release {',
+        '                signingConfig signingConfigs.appPublisherRelease',
         '            }',
         '        }',
         '    }',
@@ -227,19 +341,21 @@ func initWorkflow(profile string) error {
 	}
 
 	workflowPath := filepath.Join(projectRoot, ".github", "workflows", "deploy-play.yml")
-	playToolConfigPath := filepath.Join(projectRoot, configName)
+	appPublisherConfigPath := filepath.Join(projectRoot, configName)
 	switch profile {
 	case "kt":
 		gradlePath := filepath.Join(projectRoot, "app", "build.gradle.kts")
-		configContents, err := generatePlayToolConfig(profile, projectRoot)
+		configContents, err := generateAppPublisherConfig(profile, projectRoot)
 		if err != nil {
 			return err
 		}
-		updatedGradle, gradleChanged, err := addKotlinReleaseSigning(gradlePath)
+		updatedGradle, gradleChanged, existingSigning, err := addKotlinReleaseSigning(gradlePath)
 		if err != nil {
 			return err
 		}
-		if gradleChanged {
+		if existingSigning {
+			fmt.Printf("⚠️  Existing release signingConfig found in %s. It was left unchanged. Comment out `signingConfig = signingConfigs.getByName(\"release\")` inside buildTypes.release, then run app-publisher init kt again to add workflow signing.\n", gradlePath)
+		} else if gradleChanged {
 			info, err := os.Stat(gradlePath)
 			if err != nil {
 				return fmt.Errorf("could not inspect %s: %w", gradlePath, err)
@@ -251,13 +367,13 @@ func initWorkflow(profile string) error {
 		} else {
 			fmt.Printf("ℹ️  Release signing is already configured in %s\n", gradlePath)
 		}
-		if err := writeIfMissing(playToolConfigPath, configContents); err != nil {
+		if err := writeIfMissing(appPublisherConfigPath, configContents); err != nil {
 			return err
 		}
 		return writeIfMissing(workflowPath, kotlinDeployWorkflow)
 	case "rn":
 		appJSONPath := filepath.Join(projectRoot, "app.json")
-		configContents, err := generatePlayToolConfig(profile, projectRoot)
+		configContents, err := generateAppPublisherConfig(profile, projectRoot)
 		if err != nil {
 			return err
 		}
@@ -267,13 +383,13 @@ func initWorkflow(profile string) error {
 		}
 
 		pluginPath := filepath.Join(projectRoot, "plugins", "withAndroidReleaseSigning.js")
-		if err := writeIfMissing(pluginPath, androidReleaseSigningPlugin); err != nil {
+		if err := writeOrUpgradeAndroidReleaseSigningPlugin(pluginPath); err != nil {
 			return err
 		}
 		if err := writeIfMissing(workflowPath, reactNativeDeployWorkflow); err != nil {
 			return err
 		}
-		if err := writeIfMissing(playToolConfigPath, configContents); err != nil {
+		if err := writeIfMissing(appPublisherConfigPath, configContents); err != nil {
 			return err
 		}
 		if appJSONChanged {
@@ -317,7 +433,7 @@ func detectWorkflowProfile() (string, error) {
 	if fileExists(filepath.Join(projectRoot, "app", "build.gradle.kts")) {
 		return "kt", nil
 	}
-	return "", fmt.Errorf("could not detect project type in %s; run play-tool init kt or play-tool init rn", projectRoot)
+	return "", fmt.Errorf("could not detect project type in %s; run app-publisher init kt or app-publisher init rn", projectRoot)
 }
 
 func fileExists(path string) bool {
@@ -325,8 +441,8 @@ func fileExists(path string) bool {
 	return err == nil && info.Mode().IsRegular()
 }
 
-func generatePlayToolConfig(profile, projectRoot string) (string, error) {
-	config := generatedPlayToolConfig{Track: "internal", Key: ""}
+func generateAppPublisherConfig(profile, projectRoot string) (string, error) {
+	config := generatedAppPublisherConfig{Track: "internal", Key: ""}
 	switch profile {
 	case "kt":
 		config.AAB = filepath.ToSlash(filepath.Join("app", "build", "outputs", "bundle", "release", "app-release.aab"))
@@ -367,19 +483,24 @@ func generatePlayToolConfig(profile, projectRoot string) (string, error) {
 	return string(data) + "\n", nil
 }
 
-func addKotlinReleaseSigning(gradlePath string) ([]byte, bool, error) {
+func addKotlinReleaseSigning(gradlePath string) ([]byte, bool, bool, error) {
 	data, err := os.ReadFile(gradlePath)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not read Kotlin Gradle config %s: %w", gradlePath, err)
+		return nil, false, false, fmt.Errorf("could not read Kotlin Gradle config %s: %w", gradlePath, err)
 	}
 	if !bytes.Contains(data, []byte("plugins {")) || !bytes.Contains(data, []byte("android {")) {
-		return nil, false, fmt.Errorf("%s does not look like an Android Kotlin DSL build.gradle.kts file", gradlePath)
+		return nil, false, false, fmt.Errorf("%s does not look like an Android Kotlin DSL build.gradle.kts file", gradlePath)
 	}
-	updated, importAdded := ensureKotlinPropertiesImport(data)
-	if bytes.Contains(data, []byte(kotlinReleaseSigningMarker)) {
+	activeCode := kotlinCommentPattern.ReplaceAll(data, nil)
+	if bytes.Contains(data, []byte(kotlinReleaseSigningMarker)) && bytes.Contains(activeCode, []byte("appPublisherKeystoreFile")) {
+		updated, importAdded := ensureKotlinPropertiesImport(data)
 		fixed := bytes.ReplaceAll(updated, []byte("java.util.Properties()"), []byte("Properties()"))
-		return fixed, importAdded || !bytes.Equal(fixed, data), nil
+		return fixed, importAdded || !bytes.Equal(fixed, data), false, nil
 	}
+	if kotlinReleaseSigningConfigPattern.Match(activeCode) {
+		return data, false, true, nil
+	}
+	updated, _ := ensureKotlinPropertiesImport(data)
 	updated = append([]byte(nil), updated...)
 	newline := []byte("\n")
 	if bytes.Contains(data, []byte("\r\n")) {
@@ -391,7 +512,7 @@ func addKotlinReleaseSigning(gradlePath string) ([]byte, bool, error) {
 	updated = append(updated, newline...)
 	config := bytes.ReplaceAll([]byte(kotlinReleaseSigningConfig), []byte("\n"), newline)
 	updated = append(updated, config...)
-	return updated, true, nil
+	return updated, true, false, nil
 }
 
 func ensureKotlinPropertiesImport(data []byte) ([]byte, bool) {
@@ -434,6 +555,36 @@ func writeIfMissing(path, contents string) error {
 	}
 
 	fmt.Printf("✅ Created %s\n", path)
+	return nil
+}
+
+func writeOrUpgradeAndroidReleaseSigningPlugin(pluginPath string) error {
+	existing, err := os.ReadFile(pluginPath)
+	if os.IsNotExist(err) {
+		return writeIfMissing(pluginPath, androidReleaseSigningPlugin)
+	}
+	if err != nil {
+		return fmt.Errorf("could not read React Native signing plugin %s: %w", pluginPath, err)
+	}
+	normalize := func(data []byte) string {
+		return strings.TrimSpace(strings.ReplaceAll(string(data), "\r\n", "\n"))
+	}
+	if normalize(existing) == normalize([]byte(androidReleaseSigningPlugin)) {
+		fmt.Printf("ℹ️  %s already has local signing support; leaving it unchanged\n", pluginPath)
+		return nil
+	}
+	if normalize(existing) != normalize([]byte(previousAndroidReleaseSigningPlugin)) {
+		fmt.Printf("ℹ️  %s contains custom changes; leaving it unchanged. Add .env.local signing support manually if needed\n", pluginPath)
+		return nil
+	}
+	info, err := os.Stat(pluginPath)
+	if err != nil {
+		return fmt.Errorf("could not inspect React Native signing plugin %s: %w", pluginPath, err)
+	}
+	if err := os.WriteFile(pluginPath, []byte(androidReleaseSigningPlugin), info.Mode().Perm()); err != nil {
+		return fmt.Errorf("could not upgrade React Native signing plugin %s: %w", pluginPath, err)
+	}
+	fmt.Printf("✅ Updated %s with .env.local signing support\n", pluginPath)
 	return nil
 }
 

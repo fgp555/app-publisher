@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const configName = "play-tool.json"
+const configName = "app-publisher.json"
 
 var applicationIDRe = regexp.MustCompile(`(?m)^[ \t]*applicationId(?:[ \t]*=[ \t]*|[ \t]+)["']([^"']+)["']`)
 
@@ -25,7 +25,7 @@ type Config struct {
 }
 
 // loadConfig uses automatic values from the Gradle project and applies
-// optional overrides from play-tool.json.
+// optional overrides from app-publisher.json.
 func loadConfig() (Config, error) {
 	startDir, err := os.Getwd()
 	if err != nil {
@@ -37,7 +37,7 @@ func loadConfig() (Config, error) {
 		return Config{}, err
 	}
 	if !foundProject {
-		return Config{}, fmt.Errorf("no Android/React Native project detected from %s; run play-tool inside the project or its android directory", startDir)
+		return Config{}, fmt.Errorf("no Android/React Native project detected from %s; run app-publisher inside the project or its android directory", startDir)
 	}
 
 	path, err := findConfig(startDir, projectRoot)
@@ -102,7 +102,7 @@ func loadConfig() (Config, error) {
 		cfg.APKRelease = filepath.Join(cfg.GradleRoot, "app", "build", "outputs", "apk", "release", "app-release.apk")
 	}
 
-	if key := strings.TrimSpace(os.Getenv("PLAY_TOOL_KEY")); key != "" {
+	if key := strings.TrimSpace(os.Getenv("APP_PUBLISHER_KEY")); key != "" {
 		cfg.Key = resolve(cfg.GradleRoot, key)
 	}
 

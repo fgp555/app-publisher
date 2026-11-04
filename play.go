@@ -75,6 +75,7 @@ func showVersion(cfg Config) error {
 	fmt.Printf("🎯 Track:            %s\n", cfg.Track)
 	fmt.Printf("📋 Versions:         %v\n", codes)
 	fmt.Printf("🏷️  versionCode max: %d\n", max)
+	fmt.Printf("🔗 Play Store:        https://play.google.com/store/apps/details?id=%s\n", cfg.Pkg)
 	return nil
 }
 

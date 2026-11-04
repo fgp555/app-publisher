@@ -8,7 +8,7 @@ import (
 // runCI executes commands without the interactive menu, including in GitHub Actions.
 func runCI(cfg Config, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("missing command; run play-tool --help")
+		return fmt.Errorf("missing command; run app-publisher --help")
 	}
 
 	switch args[0] {
@@ -24,7 +24,7 @@ func runCI(cfg Config, args []string) error {
 		if len(args) == 2 {
 			return initWorkflow(args[1])
 		}
-		return fmt.Errorf("usage: play-tool init [kt|rn]")
+		return fmt.Errorf("usage: app-publisher init [kt|rn]")
 
 	case "assembleDebug", "assembleRelease", "bundleRelease", "installDebug", "installRelease":
 		if err := requireArgs(args, 1, args[0]); err != nil {
@@ -53,7 +53,7 @@ func runCI(cfg Config, args []string) error {
 
 	case "install":
 		if len(args) != 2 {
-			return fmt.Errorf("usage: play-tool installDebug|installRelease|adbInstallDebug|adbInstallRelease")
+			return fmt.Errorf("usage: app-publisher installDebug|installRelease|adbInstallDebug|adbInstallRelease")
 		}
 		switch args[1] {
 		case "installDebug", "installRelease":
@@ -69,7 +69,7 @@ func runCI(cfg Config, args []string) error {
 
 	case "info":
 		if len(args) != 2 {
-			return fmt.Errorf("usage: play-tool info assembleDebug|assembleRelease|bundleRelease")
+			return fmt.Errorf("usage: app-publisher info assembleDebug|assembleRelease|bundleRelease")
 		}
 		return showArtifactInfo(cfg, args[1])
 
@@ -107,13 +107,13 @@ func runCI(cfg Config, args []string) error {
 		return uploadAAB(cfg)
 
 	default:
-		return fmt.Errorf("unknown command %q; run play-tool --help", args[0])
+		return fmt.Errorf("unknown command %q; run app-publisher --help", args[0])
 	}
 }
 
 func requireArgs(args []string, count int, command string) error {
 	if len(args) != count {
-		return fmt.Errorf("incorrect usage of %s; run play-tool --help", command)
+		return fmt.Errorf("incorrect usage of %s; run app-publisher --help", command)
 	}
 	return nil
 }
@@ -146,7 +146,7 @@ func verifyArtifact(cfg Config, args []string) error {
 		return runTool(keytool, cfg.GradleRoot, "-printcert", "-jarfile", cfg.AAB)
 	}
 	if len(args) != 2 {
-		return fmt.Errorf("usage: play-tool verify apk debug|release or play-tool verify bundle")
+		return fmt.Errorf("usage: app-publisher verify apk debug|release or app-publisher verify bundle")
 	}
 	switch args[0] {
 	case "apk":
@@ -171,7 +171,7 @@ func verifyArtifact(cfg Config, args []string) error {
 
 func inspectManifest(cfg Config, args []string) error {
 	if len(args) != 2 || (args[0] != "min-sdk" && args[0] != "target-sdk") {
-		return fmt.Errorf("usage: play-tool manifest min-sdk|target-sdk debug|release")
+		return fmt.Errorf("usage: app-publisher manifest min-sdk|target-sdk debug|release")
 	}
 	apk, err := apkPath(cfg, args[1])
 	if err != nil {

@@ -28,8 +28,8 @@ jobs:
         with:
           go-version: '1.27.0'
 
-      - name: Install play-tool
-        run: go install github.com/fgp555/play-tool@latest
+      - name: Install app-publisher
+        run: go install github.com/fgp555/app-publisher@latest
 
       - name: Create service account JSON from secret
         env:
@@ -49,9 +49,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build and publish
-        run: play-tool deploy
+        run: app-publisher deploy
         env:
-          PLAY_TOOL_KEY: ${{ runner.temp }}/play-service-account.json
+          APP_PUBLISHER_KEY: ${{ runner.temp }}/play-service-account.json
           KEYSTORE_FILE: ${{ runner.temp }}/release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
