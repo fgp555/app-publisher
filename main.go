@@ -14,15 +14,25 @@ import (
 var version = "1.0.0"
 
 func main() {
-	if len(os.Args) == 2 && os.Args[1] == "--version" {
+	if exitCode, handled := dispatchAlias(); handled {
+		os.Exit(exitCode)
+	}
+	if len(os.Args) == 2 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
 		printVersion()
 		return
 	}
-	if len(os.Args) == 2 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
+	if len(os.Args) == 2 && (os.Args[1] == "--help" || os.Args[1] == "-h" || os.Args[1] == "?") {
 		printHelp()
 		return
 	}
 	if len(os.Args) > 1 && os.Args[1] == "init" {
+		if err := runCI(Config{}, os.Args[1:]); err != nil {
+			fmt.Println("❌ Error:", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "createAlias" {
 		if err := runCI(Config{}, os.Args[1:]); err != nil {
 			fmt.Println("❌ Error:", err)
 			os.Exit(1)
@@ -58,7 +68,7 @@ func runInteractive(cfg Config) {
 		idx, err := selectOption("🧭 Main menu", []string{
 			"☁️  Google Play",
 			"🔨 Build and install",
-			"🔍 Info and verification",
+			"🔍 Info",
 			"⚙️  Project setup",
 			"🚪 Exit",
 		})
@@ -86,6 +96,7 @@ func projectSetupMenu(cfg Config) {
 		"app-publisher init",
 		"app-publisher init kt",
 		"app-publisher init rn",
+		"app-publisher createAlias",
 		"app-publisher --version",
 		"app-publisher --help",
 		"Back",
@@ -101,12 +112,14 @@ func projectSetupMenu(cfg Config) {
 			return
 		}
 		switch idx {
-		case 3:
+		case 4:
 			printVersion()
 			fmt.Println()
-		case 4:
+		case 5:
 			printHelp()
 			fmt.Println()
+		case 3:
+			report(runCI(cfg, []string{"createAlias"}))
 		default:
 			report(runCI(cfg, commands[idx]))
 		}
@@ -119,14 +132,16 @@ func printVersion() {
 
 func buildInstallMenu(cfg Config) {
 	items := []string{
+		"app-publisher prebuild",
+		"app-publisher prebuildClean",
+		"app-publisher build",
 		"app-publisher assembleDebug",
-		"app-publisher installDebug",
-		"app-publisher adbInstallDebug",
 		"app-publisher assembleRelease",
-		"app-publisher installRelease",
-		"app-publisher adbInstallRelease",
 		"app-publisher bundleRelease",
 		"app-publisher cleanBundleRelease",
+		"app-publisher install",
+		"app-publisher installDebug",
+		"app-publisher installRelease",
 		"Back",
 	}
 	for {
@@ -135,14 +150,16 @@ func buildInstallMenu(cfg Config) {
 			return
 		}
 		commands := [][]string{
+			{"prebuild"},
+			{"prebuildClean"},
+			{"build"},
 			{"assembleDebug"},
-			{"installDebug"},
-			{"adbInstallDebug"},
 			{"assembleRelease"},
-			{"installRelease"},
-			{"adbInstallRelease"},
 			{"bundleRelease"},
 			{"cleanBundleRelease"},
+			{"install"},
+			{"installDebug"},
+			{"installRelease"},
 		}
 		report(runCI(cfg, commands[idx]))
 	}
@@ -150,32 +167,20 @@ func buildInstallMenu(cfg Config) {
 
 func infoMenu(cfg Config) {
 	items := []string{
+		"app-publisher info",
 		"app-publisher info assembleDebug",
 		"app-publisher info assembleRelease",
 		"app-publisher info bundleRelease",
-		"app-publisher verify apk debug",
-		"app-publisher verify apk release",
-		"app-publisher verify bundle",
-		"app-publisher manifest min-sdk debug",
-		"app-publisher manifest target-sdk debug",
-		"app-publisher manifest min-sdk release",
-		"app-publisher manifest target-sdk release",
 		"Back",
 	}
 	commands := [][]string{
+		{"info"},
 		{"info", "assembleDebug"},
 		{"info", "assembleRelease"},
 		{"info", "bundleRelease"},
-		{"verify", "apk", "debug"},
-		{"verify", "apk", "release"},
-		{"verify", "bundle"},
-		{"manifest", "min-sdk", "debug"},
-		{"manifest", "target-sdk", "debug"},
-		{"manifest", "min-sdk", "release"},
-		{"manifest", "target-sdk", "release"},
 	}
 	for {
-		idx, err := selectOption("Info and verification", items)
+		idx, err := selectOption("Info", items)
 		if err != nil || idx == len(items)-1 {
 			return
 		}
@@ -186,9 +191,9 @@ func infoMenu(cfg Config) {
 func googlePlayMenu(cfg Config) {
 	items := []string{
 		"app-publisher show",
-		"app-publisher openStore",
 		"app-publisher upload",
 		"app-publisher deploy",
+		"app-publisher openStore",
 		"Back",
 	}
 	for {
@@ -201,15 +206,15 @@ func googlePlayMenu(cfg Config) {
 		case 0:
 			report(showVersion(cfg))
 		case 1:
-			report(openStore(cfg))
-		case 2:
 			if confirm(fmt.Sprintf("📤 Upload %s to %s?", cfg.AAB, cfg.Track)) {
 				report(uploadAAB(cfg))
 			}
-		case 3:
+		case 2:
 			if confirm(fmt.Sprintf("🔢 Increment versionCode, build, and publish to %s?", cfg.Track)) {
 				report(runCI(cfg, []string{"deploy"}))
 			}
+		case 3:
+			report(openStore(cfg))
 		}
 	}
 }
@@ -219,52 +224,44 @@ func printHelp() {
 
 Usage:
   app-publisher
-  app-publisher init
-  app-publisher init kt
-  app-publisher init rn
 
-  Google Play:
+  [Google Play]
   app-publisher show
-  app-publisher openStore
   app-publisher upload
   app-publisher deploy
+  app-publisher openStore
 
-  Build and install:
+  [Build and install]
+  app-publisher prebuild
+  app-publisher prebuildClean
+  app-publisher build
   app-publisher assembleDebug
   app-publisher assembleRelease
   app-publisher bundleRelease
   app-publisher cleanBundleRelease
+  app-publisher install
   app-publisher installDebug
   app-publisher installRelease
-  app-publisher adbInstallDebug
-  app-publisher adbInstallRelease
 
-  Info and verification:
+  [Info]
+  app-publisher info
   app-publisher info assembleDebug
   app-publisher info assembleRelease
   app-publisher info bundleRelease
-  app-publisher verify apk debug
-  app-publisher verify apk release
-  app-publisher verify bundle
-  app-publisher manifest min-sdk debug
-  app-publisher manifest target-sdk debug
-  app-publisher manifest min-sdk release
-  app-publisher manifest target-sdk release
 
+  [Project setup]
+  app-publisher init
+  app-publisher init kt
+  app-publisher init rn
+  app-publisher createAlias
   app-publisher --version
+  app-publisher -v
   app-publisher --help
+  app-publisher -h
+  app-publisher ?
 
-Configuration:
-  app-publisher.json is optional. Native Android and React Native projects are detected.
-  package is detected from applicationId in build.gradle.kts or build.gradle.
-  For React Native, the wrapper runs from android/, and the JSON can be placed
-  in the directory containing package.json.
-  aab uses the standard release path, and APP_PUBLISHER_KEY points to the Google Play key.
-  APKs use the standard paths under app/build/outputs/apk; override them with
-  apkDebug and apkRelease. Android tools are searched in the SDK or PATH;
-  keytool is searched in JAVA_HOME or PATH.
-  info bundleRelease also requires APP_BUNDLETOOL_JAR to point to bundletool-all.jar.
-  The JSON can override these values; relative paths are resolved from its directory.
+Documentation:
+  https://github.com/fgp555/app-publisher#readme
 
 Author:
   Frank GP Developer: https://frankgp.com

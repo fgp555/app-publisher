@@ -12,6 +12,28 @@ func runCI(cfg Config, args []string) error {
 	}
 
 	switch args[0] {
+	case "build":
+		if err := requireArgs(args, 1, "build"); err != nil {
+			return err
+		}
+		if err := checkGeneratedReleaseSigning(cfg); err != nil {
+			return err
+		}
+		fmt.Println("🛠️  Building debug APK, release APK, and release AAB...")
+		return runGradleTasks(cfg, "assembleDebug", "assembleRelease", "bundleRelease")
+
+	case "prebuild", "prebuildClean":
+		if err := requireArgs(args, 1, args[0]); err != nil {
+			return err
+		}
+		return runExpoPrebuild(cfg, args[0] == "prebuildClean")
+
+	case "createAlias":
+		if err := requireArgs(args, 1, "createAlias"); err != nil {
+			return err
+		}
+		return createAlias()
+
 	case "init":
 		if len(args) == 1 {
 			profile, err := detectWorkflowProfile()
@@ -38,18 +60,6 @@ func runCI(cfg Config, args []string) error {
 		fmt.Printf("🛠️  Running Gradle %s...\n", args[0])
 		return runGradleTasks(cfg, args[0])
 
-	case "adbInstallDebug":
-		if err := requireArgs(args, 1, args[0]); err != nil {
-			return err
-		}
-		return adbInstall(cfg, "debug")
-
-	case "adbInstallRelease":
-		if err := requireArgs(args, 1, args[0]); err != nil {
-			return err
-		}
-		return adbInstall(cfg, "release")
-
 	case "cleanBundleRelease":
 		if err := requireArgs(args, 1, "cleanBundleRelease"); err != nil {
 			return err
@@ -60,31 +70,24 @@ func runCI(cfg Config, args []string) error {
 		return build(cfg)
 
 	case "install":
-		if len(args) != 2 {
-			return fmt.Errorf("usage: app-publisher installDebug|installRelease|adbInstallDebug|adbInstallRelease")
+		if err := requireArgs(args, 1, "install"); err != nil {
+			return err
 		}
-		switch args[1] {
-		case "installDebug", "installRelease":
-			if requiresReleaseSigning(args[1]) {
-				if err := checkGeneratedReleaseSigning(cfg); err != nil {
-					return err
-				}
-			}
-			fmt.Printf("📲 Running Gradle %s...\n", args[1])
-			return runGradleTasks(cfg, args[1])
-		case "adbInstallDebug":
-			return adbInstall(cfg, "debug")
-		case "adbInstallRelease":
-			return adbInstall(cfg, "release")
-		default:
-			return fmt.Errorf("invalid install task; use installDebug, installRelease, adbInstallDebug, or adbInstallRelease")
+		if err := checkGeneratedReleaseSigning(cfg); err != nil {
+			return err
 		}
+		fmt.Println("📲 Running Gradle installRelease...")
+		return runGradleTasks(cfg, "installRelease")
 
 	case "info":
-		if len(args) != 2 {
-			return fmt.Errorf("usage: app-publisher info assembleDebug|assembleRelease|bundleRelease")
+		if len(args) > 2 {
+			return fmt.Errorf("usage: app-publisher info [assembleDebug|assembleRelease|bundleRelease]")
 		}
-		return showArtifactInfo(cfg, args[1])
+		target := ""
+		if len(args) == 2 {
+			target = args[1]
+		}
+		return showArtifactInfo(cfg, target)
 
 	case "show":
 		if err := requireArgs(args, 1, "show"); err != nil {
@@ -97,12 +100,6 @@ func runCI(cfg Config, args []string) error {
 			return err
 		}
 		return openStore(cfg)
-
-	case "verify":
-		return verifyArtifact(cfg, args[1:])
-
-	case "manifest":
-		return inspectManifest(cfg, args[1:])
 
 	case "upload":
 		if err := requireArgs(args, 1, "upload"); err != nil {
@@ -148,88 +145,6 @@ func requireArgs(args []string, count int, command string) error {
 	}
 	return nil
 }
-func adbInstall(cfg Config, variant string) error {
-	apk, err := apkPath(cfg, variant)
-	if err != nil {
-		return err
-	}
-	if err := requireFile(apk, "APK"); err != nil {
-		return err
-	}
-	adb, err := resolveAndroidTool("adb")
-	if err != nil {
-		return err
-	}
-	fmt.Printf("📲 Installing %s APK on the connected device...\n", variant)
-	return runTool(adb, cfg.GradleRoot, "install", "-r", "-d", apk)
-}
-
-func verifyArtifact(cfg Config, args []string) error {
-	if len(args) == 1 && args[0] == "bundle" {
-		if err := requireFile(cfg.AAB, "AAB"); err != nil {
-			return err
-		}
-		keytool, err := resolveKeytool()
-		if err != nil {
-			return err
-		}
-		fmt.Println("🔏 Verifying AAB certificate...")
-		return runTool(keytool, cfg.GradleRoot, "-printcert", "-jarfile", cfg.AAB)
-	}
-	if len(args) != 2 {
-		return fmt.Errorf("usage: app-publisher verify apk debug|release or app-publisher verify bundle")
-	}
-	switch args[0] {
-	case "apk":
-		apk, err := apkPath(cfg, args[1])
-		if err != nil {
-			return err
-		}
-		if err := requireFile(apk, "APK"); err != nil {
-			return err
-		}
-		apksigner, err := resolveAndroidTool("apksigner")
-		if err != nil {
-			return err
-		}
-		fmt.Printf("🔏 Verifying %s APK certificate...\n", args[1])
-		return runTool(apksigner, cfg.GradleRoot, "verify", "--print-certs", apk)
-
-	default:
-		return fmt.Errorf("invalid artifact; use apk debug|release or bundle")
-	}
-}
-
-func inspectManifest(cfg Config, args []string) error {
-	if len(args) != 2 || (args[0] != "min-sdk" && args[0] != "target-sdk") {
-		return fmt.Errorf("usage: app-publisher manifest min-sdk|target-sdk debug|release")
-	}
-	apk, err := apkPath(cfg, args[1])
-	if err != nil {
-		return err
-	}
-	if err := requireFile(apk, "APK"); err != nil {
-		return err
-	}
-	apkanalyzer, err := resolveAndroidTool("apkanalyzer")
-	if err != nil {
-		return err
-	}
-	fmt.Printf("📄 Reading APK %s...\n", args[0])
-	return runTool(apkanalyzer, cfg.GradleRoot, "manifest", args[0], apk)
-}
-
-func apkPath(cfg Config, variant string) (string, error) {
-	switch variant {
-	case "debug":
-		return cfg.APKDebug, nil
-	case "release":
-		return cfg.APKRelease, nil
-	default:
-		return "", fmt.Errorf("invalid variant %q; use debug or release", variant)
-	}
-}
-
 func requireFile(path, description string) error {
 	info, err := os.Stat(path)
 	if err != nil {

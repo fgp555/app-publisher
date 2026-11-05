@@ -12,7 +12,11 @@ import (
 )
 
 var signerFingerprintRe = regexp.MustCompile(`(?i)certificate SHA-(1|256) digest:\s*([[:xdigit:]:]+)`)
+var signerDNRe = regexp.MustCompile(`(?im)^\s*V\d+ Signer: certificate DN:\s*(.+?)\s*$`)
+var signerMD5Re = regexp.MustCompile(`(?im)^\s*V\d+ Signer: certificate MD5 digest:\s*([[:xdigit:]:]+)\s*$`)
 var keytoolFingerprintRe = regexp.MustCompile(`(?im)^\s*SHA-?(1|256):\s*(.+)$`)
+var keytoolDNRe = regexp.MustCompile(`(?im)^\s*Owner:\s*(.+?)\s*$`)
+var keytoolMD5Re = regexp.MustCompile(`(?im)^\s*MD5:\s*([[:xdigit:]:]+)\s*$`)
 
 const bundletoolReleasesURL = "https://github.com/google/bundletool/releases"
 
@@ -22,6 +26,8 @@ type artifactInfo struct {
 	VersionName string
 	MinSDK      string
 	TargetSDK   string
+	SignerDN    string
+	MD5         string
 	SHA1        string
 	SHA256      string
 	Signature   string
@@ -30,6 +36,15 @@ type artifactInfo struct {
 }
 
 func showArtifactInfo(cfg Config, target string) error {
+	if target == "" {
+		for _, artifact := range []string{"assembleDebug", "assembleRelease", "bundleRelease"} {
+			if err := showArtifactInfo(cfg, artifact); err != nil {
+				return fmt.Errorf("info %s: %w", artifact, err)
+			}
+		}
+		return nil
+	}
+
 	var info artifactInfo
 	var err error
 	switch target {
@@ -86,6 +101,8 @@ func inspectAPK(path string) (artifactInfo, error) {
 		return artifactInfo{}, fmt.Errorf("could not verify APK signature: %w", err)
 	}
 	info.Signature = "valid"
+	info.SignerDN = firstCapture(signerDNRe, certOutput)
+	info.MD5 = firstCapture(signerMD5Re, certOutput)
 	info.SHA1, info.SHA256 = parseFingerprints(signerFingerprintRe, certOutput)
 	stat, err := os.Stat(path)
 	if err != nil {
@@ -129,6 +146,8 @@ func inspectBundle(path string) (artifactInfo, error) {
 		return artifactInfo{}, fmt.Errorf("could not read AAB certificate: %w", err)
 	}
 	info.SHA1, info.SHA256 = parseFingerprints(keytoolFingerprintRe, certOutput)
+	info.SignerDN = firstCapture(keytoolDNRe, certOutput)
+	info.MD5 = firstCapture(keytoolMD5Re, certOutput)
 	if _, err := captureToolOutput(jarsigner, filepath.Dir(path), "-verify", path); err != nil {
 		return artifactInfo{}, fmt.Errorf("could not verify AAB JAR signature: %w", err)
 	}
@@ -194,6 +213,14 @@ func parseFingerprints(re *regexp.Regexp, output []byte) (sha1, sha256 string) {
 	return sha1, sha256
 }
 
+func firstCapture(re *regexp.Regexp, output []byte) string {
+	match := re.FindSubmatch(output)
+	if len(match) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(string(match[1]))
+}
+
 func printArtifactInfo(info artifactInfo, variant string) {
 	fmt.Printf("\n📦 Artifact: %s (%s)\n", variant, formatBytes(info.Size))
 	fmt.Printf("📍 File:      %s\n", info.Path)
@@ -203,6 +230,12 @@ func printArtifactInfo(info artifactInfo, variant string) {
 	fmt.Printf("🤖 minSdk:      %s\n", valueOrUnknown(info.MinSDK))
 	fmt.Printf("🎯 targetSdk:   %s\n", valueOrUnknown(info.TargetSDK))
 	fmt.Printf("🛡️  Signature:  %s\n", valueOrUnknown(info.Signature))
+	dnLabel := "V2 Signer DN:"
+	if variant == "bundleRelease" {
+		dnLabel = "Upload cert DN:"
+	}
+	fmt.Printf("🔏 %-14s %s\n", dnLabel, valueOrUnknown(info.SignerDN))
+	fmt.Printf("🔐 MD5:        %s\n", formatFingerprint(info.MD5))
 	fmt.Printf("🔐 SHA-1:       %s\n", formatFingerprint(info.SHA1))
 	fmt.Printf("🔐 SHA-256:     %s\n", formatFingerprint(info.SHA256))
 }
@@ -282,4 +315,3 @@ func resolveJDKTool(name string) (string, error) {
 	}
 	return "", fmt.Errorf("%s not found; check JAVA_HOME or add the JDK to PATH", name)
 }
-
