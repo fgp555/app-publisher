@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"bytes"
@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"regexp"
+	"strings"
 )
 
 const kotlinDeployWorkflow = `name: Deploy Android app to Google Play
@@ -72,6 +72,7 @@ jobs:
 
 const kotlinReleaseSigningMarker = "// app-publisher: release signing from local.properties or environment"
 const kotlinPropertiesImport = "import java.util.Properties"
+
 var kotlinReleaseSigningConfigPattern = regexp.MustCompile(`(?s)\bbuildTypes\s*\{.*?\brelease\s*\{.*?\bsigningConfig\s*(?:=|:)`)
 var kotlinCommentPattern = regexp.MustCompile(`(?s)/\*.*?\*/|//[^\r\n]*`)
 

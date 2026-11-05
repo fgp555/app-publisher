@@ -23,7 +23,7 @@ app-publisher --help
 
 Go installs the executable in `$(go env GOPATH)/bin` (usually `%USERPROFILE%/go/bin` on Windows). Add that directory to your `PATH` to run `app-publisher` from any terminal. Open a new terminal after changing `PATH`.
 
-To build or install app-publisher from a local source checkout, see [CONTRIBUTING.md](CONTRIBUTING.md).
+To build or install app-publisher from a local source checkout, see [CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ## Automatic and optional configuration
 

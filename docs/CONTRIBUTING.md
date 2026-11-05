@@ -29,4 +29,4 @@ go install .
 
 On Windows, Go usually installs it to `%USERPROFILE%\go\bin`. Add that directory to `PATH` if you want to run `app-publisher` from any terminal.
 
-For regular use, install the published CLI with the command in the main [README](README.md).
+For regular use, install the published CLI with the command in the main [README](../README.md).

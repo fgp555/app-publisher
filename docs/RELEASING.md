@@ -7,7 +7,7 @@ This guide is for maintainers publishing a new app-publisher release. The CLI's 
 
 ## Release checklist
 
-1. Update the `version` variable in `main.go` to the product version for the release.
+1. Update the `version` variable in the repository root's `main.go` to the product version for the release.
 2. Review the README, generated workflows, and release notes for accuracy.
 3. Run the project checks before releasing:
 
