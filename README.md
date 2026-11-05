@@ -225,7 +225,7 @@ For Expo projects, `prebuild` runs `npx expo prebuild`, and `prebuildClean` runs
 
 `build` runs `assembleDebug`, `assembleRelease`, and `bundleRelease` in one Gradle invocation without `clean`. It produces both APKs and the release AAB under the standard Gradle output folders.
 
-`clean` runs the Gradle `clean` task. To clean and then build the release AAB, run `app-publisher clean` followed by `app-publisher bundleRelease`. The `assembleDebug`, `assembleRelease`, and `bundleRelease` commands run the corresponding Gradle task. `install` and `installRelease` run Gradle's `installRelease` task; `installDebug` runs `installDebug`. Tools are searched for in standard Android SDK/JDK locations and then on `PATH`.
+`clean` runs the Gradle `clean` task. To clean and then build the release AAB, run `app-publisher clean` followed by `app-publisher bundleRelease`. The `assembleDebug`, `assembleRelease`, and `bundleRelease` commands run the corresponding Gradle task. `install` and `installRelease` run Gradle's `installRelease` task; `installDebug` runs `installDebug`. Install commands check for at least one authorized Android device or emulator with `adb` before starting Gradle. Tools are searched for in standard Android SDK/JDK locations and then on `PATH`.
 
 `deploy` builds Kotlin Android projects with `clean bundleRelease`. For React Native/Expo projects, it runs `bundleRelease` without `clean` to avoid cleaning native CMake/Gradle outputs before the build.
 

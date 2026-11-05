@@ -27,6 +27,10 @@ func Run(productVersion string) {
 		printHelp()
 		return
 	}
+	if len(os.Args) > 1 && !isKnownCommand(os.Args[1]) {
+		fmt.Printf("❌ Error: unknown command %q; run app-publisher --help\n", os.Args[1])
+		os.Exit(1)
+	}
 	if len(os.Args) > 1 && os.Args[1] == "init" {
 		if err := runCI(Config{}, os.Args[1:]); err != nil {
 			fmt.Println("❌ Error:", err)

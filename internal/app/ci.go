@@ -5,6 +5,17 @@ import (
 	"os"
 )
 
+func isKnownCommand(command string) bool {
+	switch command {
+	case "build", "prebuild", "prebuildClean", "createAlias", "update", "uninstall",
+		"init", "assembleDebug", "assembleRelease", "bundleRelease", "installDebug",
+		"installRelease", "clean", "install", "info", "show", "openStore", "upload", "deploy":
+		return true
+	default:
+		return false
+	}
+}
+
 // runCI executes commands without the interactive menu, including in GitHub Actions.
 func runCI(cfg Config, args []string) error {
 	if len(args) == 0 {
@@ -69,6 +80,11 @@ func runCI(cfg Config, args []string) error {
 				return err
 			}
 		}
+		if requiresConnectedDevice(args[0]) {
+			if err := requireConnectedAndroidDevice(cfg); err != nil {
+				return err
+			}
+		}
 		fmt.Printf("🛠️  Running Gradle %s...\n", args[0])
 		return runGradleTasks(cfg, args[0])
 
@@ -84,6 +100,9 @@ func runCI(cfg Config, args []string) error {
 			return err
 		}
 		if err := checkGeneratedReleaseSigning(cfg); err != nil {
+			return err
+		}
+		if err := requireConnectedAndroidDevice(cfg); err != nil {
 			return err
 		}
 		fmt.Println("📲 Running Gradle installRelease...")
@@ -143,6 +162,15 @@ func runCI(cfg Config, args []string) error {
 func requiresReleaseSigning(task string) bool {
 	switch task {
 	case "assembleRelease", "bundleRelease", "installRelease":
+		return true
+	default:
+		return false
+	}
+}
+
+func requiresConnectedDevice(task string) bool {
+	switch task {
+	case "installDebug", "installRelease":
 		return true
 	default:
 		return false
