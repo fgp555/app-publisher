@@ -34,6 +34,18 @@ func runCI(cfg Config, args []string) error {
 		}
 		return createAlias()
 
+	case "update":
+		if err := requireArgs(args, 1, "update"); err != nil {
+			return err
+		}
+		return updateCLI()
+
+	case "uninstall":
+		if err := requireArgs(args, 1, "uninstall"); err != nil {
+			return err
+		}
+		return uninstallCLI()
+
 	case "init":
 		if len(args) == 1 {
 			profile, err := detectWorkflowProfile()
@@ -60,14 +72,12 @@ func runCI(cfg Config, args []string) error {
 		fmt.Printf("🛠️  Running Gradle %s...\n", args[0])
 		return runGradleTasks(cfg, args[0])
 
-	case "cleanBundleRelease":
-		if err := requireArgs(args, 1, "cleanBundleRelease"); err != nil {
+	case "clean":
+		if err := requireArgs(args, 1, "clean"); err != nil {
 			return err
 		}
-		if err := checkGeneratedReleaseSigning(cfg); err != nil {
-			return err
-		}
-		return build(cfg)
+		fmt.Println("🧹 Running Gradle clean...")
+		return runGradleTasks(cfg, "clean")
 
 	case "install":
 		if err := requireArgs(args, 1, "install"); err != nil {

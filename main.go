@@ -32,7 +32,7 @@ func main() {
 		}
 		return
 	}
-	if len(os.Args) > 1 && os.Args[1] == "createAlias" {
+	if len(os.Args) > 1 && (os.Args[1] == "createAlias" || os.Args[1] == "update" || os.Args[1] == "uninstall") {
 		if err := runCI(Config{}, os.Args[1:]); err != nil {
 			fmt.Println("❌ Error:", err)
 			os.Exit(1)
@@ -84,19 +84,23 @@ func runInteractive(cfg Config) {
 		case 2:
 			infoMenu(cfg)
 		case 3:
-			projectSetupMenu(cfg)
+			if projectSetupMenu(cfg) {
+				return
+			}
 		case 4:
 			return
 		}
 	}
 }
 
-func projectSetupMenu(cfg Config) {
+func projectSetupMenu(cfg Config) bool {
 	items := []string{
 		"app-publisher init",
 		"app-publisher init kt",
 		"app-publisher init rn",
 		"app-publisher createAlias",
+		"app-publisher update",
+		"app-publisher uninstall",
 		"app-publisher --version",
 		"app-publisher --help",
 		"Back",
@@ -109,13 +113,19 @@ func projectSetupMenu(cfg Config) {
 	for {
 		idx, err := selectOption("Project setup", items)
 		if err != nil || idx == len(items)-1 {
-			return
+			return false
 		}
 		switch idx {
 		case 4:
+			report(runCI(cfg, []string{"update"}))
+			return true
+		case 5:
+			report(runCI(cfg, []string{"uninstall"}))
+			return true
+		case 6:
 			printVersion()
 			fmt.Println()
-		case 5:
+		case 7:
 			printHelp()
 			fmt.Println()
 		case 3:
@@ -134,12 +144,12 @@ func buildInstallMenu(cfg Config) {
 	items := []string{
 		"app-publisher prebuild",
 		"app-publisher prebuildClean",
+		"app-publisher clean",
 		"app-publisher build",
+		"app-publisher install",
 		"app-publisher assembleDebug",
 		"app-publisher assembleRelease",
 		"app-publisher bundleRelease",
-		"app-publisher cleanBundleRelease",
-		"app-publisher install",
 		"app-publisher installDebug",
 		"app-publisher installRelease",
 		"Back",
@@ -152,12 +162,12 @@ func buildInstallMenu(cfg Config) {
 		commands := [][]string{
 			{"prebuild"},
 			{"prebuildClean"},
+			{"clean"},
 			{"build"},
+			{"install"},
 			{"assembleDebug"},
 			{"assembleRelease"},
 			{"bundleRelease"},
-			{"cleanBundleRelease"},
-			{"install"},
 			{"installDebug"},
 			{"installRelease"},
 		}
@@ -234,12 +244,12 @@ Usage:
   [Build and install]
   app-publisher prebuild
   app-publisher prebuildClean
+  app-publisher clean
   app-publisher build
+  app-publisher install
   app-publisher assembleDebug
   app-publisher assembleRelease
   app-publisher bundleRelease
-  app-publisher cleanBundleRelease
-  app-publisher install
   app-publisher installDebug
   app-publisher installRelease
 
@@ -254,6 +264,8 @@ Usage:
   app-publisher init kt
   app-publisher init rn
   app-publisher createAlias
+  app-publisher update
+  app-publisher uninstall
   app-publisher --version
   app-publisher -v
   app-publisher --help
