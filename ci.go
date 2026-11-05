@@ -30,6 +30,11 @@ func runCI(cfg Config, args []string) error {
 		if err := requireArgs(args, 1, args[0]); err != nil {
 			return err
 		}
+		if requiresReleaseSigning(args[0]) {
+			if err := checkGeneratedReleaseSigning(cfg); err != nil {
+				return err
+			}
+		}
 		fmt.Printf("🛠️  Running Gradle %s...\n", args[0])
 		return runGradleTasks(cfg, args[0])
 
@@ -49,6 +54,9 @@ func runCI(cfg Config, args []string) error {
 		if err := requireArgs(args, 1, "cleanBundleRelease"); err != nil {
 			return err
 		}
+		if err := checkGeneratedReleaseSigning(cfg); err != nil {
+			return err
+		}
 		return build(cfg)
 
 	case "install":
@@ -57,6 +65,11 @@ func runCI(cfg Config, args []string) error {
 		}
 		switch args[1] {
 		case "installDebug", "installRelease":
+			if requiresReleaseSigning(args[1]) {
+				if err := checkGeneratedReleaseSigning(cfg); err != nil {
+					return err
+				}
+			}
 			fmt.Printf("📲 Running Gradle %s...\n", args[1])
 			return runGradleTasks(cfg, args[1])
 		case "adbInstallDebug":
@@ -79,6 +92,12 @@ func runCI(cfg Config, args []string) error {
 		}
 		return showVersion(cfg)
 
+	case "openStore":
+		if err := requireArgs(args, 1, "openStore"); err != nil {
+			return err
+		}
+		return openStore(cfg)
+
 	case "verify":
 		return verifyArtifact(cfg, args[1:])
 
@@ -95,6 +114,9 @@ func runCI(cfg Config, args []string) error {
 		if err := requireArgs(args, 1, "deploy"); err != nil {
 			return err
 		}
+		if err := checkGeneratedReleaseSigning(cfg); err != nil {
+			return err
+		}
 		n, err := bumpVersionCode(cfg)
 		if err != nil {
 			return fmt.Errorf("bump: %w", err)
@@ -108,6 +130,15 @@ func runCI(cfg Config, args []string) error {
 
 	default:
 		return fmt.Errorf("unknown command %q; run app-publisher --help", args[0])
+	}
+}
+
+func requiresReleaseSigning(task string) bool {
+	switch task {
+	case "assembleRelease", "bundleRelease", "installRelease":
+		return true
+	default:
+		return false
 	}
 }
 

@@ -15,7 +15,7 @@ var version = "1.0.0"
 
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == "--version" {
-		fmt.Printf("app-publisher %s %s %s/%s\n", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		printVersion()
 		return
 	}
 	if len(os.Args) == 2 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
@@ -56,9 +56,10 @@ func main() {
 func runInteractive(cfg Config) {
 	for {
 		idx, err := selectOption("🧭 Main menu", []string{
+			"☁️  Google Play",
 			"🔨 Build and install",
 			"🔍 Info and verification",
-			"☁️  Google Play",
+			"⚙️  Project setup",
 			"🚪 Exit",
 		})
 		if err != nil {
@@ -67,15 +68,53 @@ func runInteractive(cfg Config) {
 
 		switch idx {
 		case 0:
-			buildInstallMenu(cfg)
-		case 1:
-			infoMenu(cfg)
-		case 2:
 			googlePlayMenu(cfg)
+		case 1:
+			buildInstallMenu(cfg)
+		case 2:
+			infoMenu(cfg)
 		case 3:
+			projectSetupMenu(cfg)
+		case 4:
 			return
 		}
 	}
+}
+
+func projectSetupMenu(cfg Config) {
+	items := []string{
+		"app-publisher init",
+		"app-publisher init kt",
+		"app-publisher init rn",
+		"app-publisher --version",
+		"app-publisher --help",
+		"Back",
+	}
+	commands := [][]string{
+		{"init"},
+		{"init", "kt"},
+		{"init", "rn"},
+	}
+	for {
+		idx, err := selectOption("Project setup", items)
+		if err != nil || idx == len(items)-1 {
+			return
+		}
+		switch idx {
+		case 3:
+			printVersion()
+			fmt.Println()
+		case 4:
+			printHelp()
+			fmt.Println()
+		default:
+			report(runCI(cfg, commands[idx]))
+		}
+	}
+}
+
+func printVersion() {
+	fmt.Printf("app-publisher %s %s %s/%s\n", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }
 
 func buildInstallMenu(cfg Config) {
@@ -147,6 +186,7 @@ func infoMenu(cfg Config) {
 func googlePlayMenu(cfg Config) {
 	items := []string{
 		"app-publisher show",
+		"app-publisher openStore",
 		"app-publisher upload",
 		"app-publisher deploy",
 		"Back",
@@ -161,10 +201,12 @@ func googlePlayMenu(cfg Config) {
 		case 0:
 			report(showVersion(cfg))
 		case 1:
+			report(openStore(cfg))
+		case 2:
 			if confirm(fmt.Sprintf("📤 Upload %s to %s?", cfg.AAB, cfg.Track)) {
 				report(uploadAAB(cfg))
 			}
-		case 2:
+		case 3:
 			if confirm(fmt.Sprintf("🔢 Increment versionCode, build, and publish to %s?", cfg.Track)) {
 				report(runCI(cfg, []string{"deploy"}))
 			}
@@ -180,7 +222,14 @@ Usage:
   app-publisher init
   app-publisher init kt
   app-publisher init rn
+
+  Google Play:
   app-publisher show
+  app-publisher openStore
+  app-publisher upload
+  app-publisher deploy
+
+  Build and install:
   app-publisher assembleDebug
   app-publisher assembleRelease
   app-publisher bundleRelease
@@ -189,6 +238,8 @@ Usage:
   app-publisher installRelease
   app-publisher adbInstallDebug
   app-publisher adbInstallRelease
+
+  Info and verification:
   app-publisher info assembleDebug
   app-publisher info assembleRelease
   app-publisher info bundleRelease
@@ -196,11 +247,10 @@ Usage:
   app-publisher verify apk release
   app-publisher verify bundle
   app-publisher manifest min-sdk debug
-  app-publisher manifest min-sdk release
   app-publisher manifest target-sdk debug
+  app-publisher manifest min-sdk release
   app-publisher manifest target-sdk release
-  app-publisher upload
-  app-publisher deploy
+
   app-publisher --version
   app-publisher --help
 
