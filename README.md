@@ -193,6 +193,7 @@ app-publisher prebuildClean               # Run Expo Prebuild with --clean
 app-publisher clean                        # Run the Gradle clean task
 app-publisher build                       # Build debug APK, release APK, and release AAB
 app-publisher dev                         # Install, launch, and stream logs for a Kotlin Android app
+app-publisher dev --watch                 # Rebuild, reinstall, and relaunch when project files change
 app-publisher install                      # Install release with Gradle
 app-publisher assembleDebug                # Build the debug APK
 app-publisher assembleRelease              # Build the release APK
@@ -228,7 +229,7 @@ For Expo projects, `prebuild` runs `npx expo prebuild`, and `prebuildClean` runs
 
 `clean` runs the Gradle `clean` task. To clean and then build the release AAB, run `app-publisher clean` followed by `app-publisher bundleRelease`. The `assembleDebug`, `assembleRelease`, and `bundleRelease` commands run the corresponding Gradle task. `install` and `installRelease` run Gradle's `installRelease` task; `installDebug` runs `installDebug`. Install commands check for at least one authorized Android device or emulator with `adb` before starting Gradle. Tools are searched for in standard Android SDK/JDK locations and then on `PATH`.
 
-`dev` is for native Android/Kotlin projects. It runs `installDebug`, launches the app on the single connected authorized device or emulator, then streams that app's logcat output. Press `Ctrl+C` to stop log streaming. Run `app-publisher dev` again after changing code; it does not provide hot reload or a Metro-style development server. React Native/Expo projects should use their Expo development server instead.
+`dev` is for native Android/Kotlin projects. It runs `installDebug`, launches the app on the single connected authorized device or emulator, then streams that app's logcat output. Press `Ctrl+C` to stop log streaming. `dev --watch` monitors project files, waits briefly to group file saves, runs Gradle's incremental `installDebug`, restarts the app, and resumes log streaming. It rebuilds and restarts the app; it does not provide hot reload or a Metro-style development server. React Native/Expo projects should use their Expo development server instead.
 
 `deploy` builds Kotlin Android projects with `clean bundleRelease`. For React Native/Expo projects, it runs `bundleRelease` without `clean` to avoid cleaning native CMake/Gradle outputs before the build.
 

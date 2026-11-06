@@ -153,6 +153,7 @@ func buildInstallMenu(cfg Config) {
 		"app-publisher clean",
 		"app-publisher build",
 		"app-publisher dev",
+		"app-publisher dev --watch",
 		"app-publisher install",
 		"app-publisher assembleDebug",
 		"app-publisher assembleRelease",
@@ -172,6 +173,7 @@ func buildInstallMenu(cfg Config) {
 			{"clean"},
 			{"build"},
 			{"dev"},
+			{"dev", "--watch"},
 			{"install"},
 			{"assembleDebug"},
 			{"assembleRelease"},
@@ -255,6 +257,7 @@ Usage:
   app-publisher clean
   app-publisher build
   app-publisher dev
+  app-publisher dev --watch
   app-publisher install
   app-publisher assembleDebug
   app-publisher assembleRelease

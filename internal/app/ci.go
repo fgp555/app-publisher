@@ -24,10 +24,10 @@ func runCI(cfg Config, args []string) error {
 
 	switch args[0] {
 	case "dev":
-		if err := requireArgs(args, 1, "dev"); err != nil {
-			return err
+		if len(args) > 2 || (len(args) == 2 && args[1] != "--watch") {
+			return fmt.Errorf("usage: app-publisher dev [--watch]")
 		}
-		return runDev(cfg)
+		return runDev(cfg, len(args) == 2)
 
 	case "build":
 		if err := requireArgs(args, 1, "build"); err != nil {
