@@ -7,7 +7,7 @@ import (
 
 func isKnownCommand(command string) bool {
 	switch command {
-	case "build", "prebuild", "prebuildClean", "createAlias", "update", "uninstall",
+	case "build", "dev", "prebuild", "prebuildClean", "createAlias", "update", "uninstall",
 		"init", "assembleDebug", "assembleRelease", "bundleRelease", "installDebug",
 		"installRelease", "clean", "install", "info", "show", "openStore", "upload", "deploy":
 		return true
@@ -23,6 +23,12 @@ func runCI(cfg Config, args []string) error {
 	}
 
 	switch args[0] {
+	case "dev":
+		if err := requireArgs(args, 1, "dev"); err != nil {
+			return err
+		}
+		return runDev(cfg)
+
 	case "build":
 		if err := requireArgs(args, 1, "build"); err != nil {
 			return err

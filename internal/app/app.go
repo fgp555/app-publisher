@@ -152,6 +152,7 @@ func buildInstallMenu(cfg Config) {
 		"app-publisher prebuildClean",
 		"app-publisher clean",
 		"app-publisher build",
+		"app-publisher dev",
 		"app-publisher install",
 		"app-publisher assembleDebug",
 		"app-publisher assembleRelease",
@@ -170,6 +171,7 @@ func buildInstallMenu(cfg Config) {
 			{"prebuildClean"},
 			{"clean"},
 			{"build"},
+			{"dev"},
 			{"install"},
 			{"assembleDebug"},
 			{"assembleRelease"},
@@ -252,6 +254,7 @@ Usage:
   app-publisher prebuildClean
   app-publisher clean
   app-publisher build
+  app-publisher dev
   app-publisher install
   app-publisher assembleDebug
   app-publisher assembleRelease
