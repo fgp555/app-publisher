@@ -52,13 +52,36 @@ func runDev(cfg Config, watch bool) error {
 
 func launchDevApp(adb, dir, device, packageName string) error {
 	fmt.Printf("🚀 Launching %s...\n", packageName)
-	if err := runTool(adb, dir,
-		"-s", device, "shell", "monkey", "-p", packageName,
-		"-c", "android.intent.category.LAUNCHER", "1",
-	); err != nil {
-		return fmt.Errorf("could not launch the app; check that %s has a launcher activity: %w", packageName, err)
+	output, err := captureToolOutput(adb, dir,
+		"-s", device, "shell", "cmd", "package", "resolve-activity", "--brief",
+		"-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER", packageName,
+	)
+	if err != nil {
+		return fmt.Errorf("could not resolve the launcher activity for %s: %w", packageName, err)
+	}
+
+	activity := launcherComponent(string(output))
+	if activity == "" {
+		return fmt.Errorf("could not find a launcher activity for %s; package manager returned %q", packageName, strings.TrimSpace(string(output)))
+	}
+
+	if err := runTool(adb, dir, "-s", device, "shell", "am", "start", "-n", activity); err != nil {
+		return fmt.Errorf("could not launch %s using its launcher activity %s: %w", packageName, activity, err)
 	}
 	return nil
+}
+
+func launcherComponent(output string) string {
+	for _, line := range strings.Split(output, "\n") {
+		candidate := strings.TrimSpace(line)
+		if strings.HasPrefix(candidate, "ComponentInfo{") && strings.HasSuffix(candidate, "}") {
+			candidate = strings.TrimSuffix(strings.TrimPrefix(candidate, "ComponentInfo{"), "}")
+		}
+		if strings.Contains(candidate, "/") && !strings.ContainsAny(candidate, " \t\r") {
+			return candidate
+		}
+	}
+	return ""
 }
 
 func waitForAppPID(adb, dir, device, packageName string) (string, error) {
