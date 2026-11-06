@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/chzyer/readline"
 )
 
 func runDev(cfg Config, watch bool) error {
@@ -45,8 +47,7 @@ func runDev(cfg Config, watch bool) error {
 	if watch {
 		return watchDev(cfg, adb, device, pid)
 	}
-	fmt.Printf("📋 Streaming logcat for %s (press Ctrl+C to stop)...\n", cfg.Pkg)
-	return streamAppLogcat(adb, cfg.GradleRoot, device, pid)
+	return streamAppLogcat(cfg, adb, device, pid)
 }
 
 func launchDevApp(adb, dir, device, packageName string) error {
@@ -73,19 +74,116 @@ func waitForAppPID(adb, dir, device, packageName string) (string, error) {
 	return "", fmt.Errorf("app %s launched, but its process did not appear for logcat", packageName)
 }
 
-func streamAppLogcat(adb, dir, device, pid string) error {
+func streamAppLogcat(cfg Config, adb, device, pid string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	cmd := appLogcatCommand(ctx, adb, dir, device, pid)
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() != nil {
-			fmt.Println("\n⏹️  Log streaming stopped.")
-			return nil
-		}
-		return fmt.Errorf("could not stream app logcat: %w", err)
+	keys, restoreTerminal, err := startDevKeyReader(ctx)
+	if err != nil {
+		return fmt.Errorf("could not enable immediate keyboard input: %w", err)
 	}
-	return nil
+	defer func() {
+		if err := restoreTerminal(); err != nil {
+			fmt.Fprintf(os.Stderr, "\n⚠️  Could not restore terminal input mode: %v\n", err)
+		}
+	}()
+
+	logCancel, logDone := startAppLogcat(ctx, adb, cfg.GradleRoot, device, pid)
+	fmt.Printf("📋 Streaming logcat for %s (press R to restart, Ctrl+C to stop)...\n", cfg.Pkg)
+	for {
+		select {
+		case <-ctx.Done():
+			logCancel()
+			<-logDone
+			fmt.Println("\n⏹️  Development session stopped.")
+			return nil
+
+		case err := <-logDone:
+			if ctx.Err() != nil {
+				fmt.Println("\n⏹️  Development session stopped.")
+				return nil
+			}
+			if err == nil {
+				return fmt.Errorf("app logcat stopped unexpectedly")
+			}
+			return fmt.Errorf("could not stream app logcat: %w", err)
+
+		case key, ok := <-keys:
+			if !ok {
+				if ctx.Err() != nil {
+					logCancel()
+					<-logDone
+					fmt.Println("\n⏹️  Development session stopped.")
+					return nil
+				}
+				return fmt.Errorf("keyboard input stopped unexpectedly")
+			}
+			if key == 3 {
+				stop()
+				continue
+			}
+			if key != 'r' && key != 'R' {
+				continue
+			}
+
+			logCancel()
+			<-logDone
+			if ctx.Err() != nil {
+				fmt.Println("\n⏹️  Development session stopped.")
+				return nil
+			}
+
+			fmt.Println("🔄 Restarting debug app...")
+			if err := runGradleTasks(cfg, "installDebug"); err != nil {
+				return fmt.Errorf("could not reinstall the debug app: %w", err)
+			}
+			if err := runTool(adb, cfg.GradleRoot, "-s", device, "shell", "am", "force-stop", cfg.Pkg); err != nil {
+				return fmt.Errorf("could not stop the running app before restarting: %w", err)
+			}
+			if err := launchDevApp(adb, cfg.GradleRoot, device, cfg.Pkg); err != nil {
+				return err
+			}
+			pid, err = waitForAppPID(adb, cfg.GradleRoot, device, cfg.Pkg)
+			if err != nil {
+				return err
+			}
+			fmt.Println("✅ App restarted; press R to restart again.")
+			logCancel, logDone = startAppLogcat(ctx, adb, cfg.GradleRoot, device, pid)
+		}
+	}
+}
+
+func startDevKeyReader(ctx context.Context) (<-chan rune, func() error, error) {
+	terminalState, err := readline.MakeRaw(readline.GetStdin())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	keys := make(chan rune, 1)
+	go func() {
+		defer close(keys)
+		var input [1]byte
+		for {
+			n, err := os.Stdin.Read(input[:])
+			if err != nil {
+				return
+			}
+			if n == 0 {
+				continue
+			}
+			key := rune(input[0])
+			select {
+			case keys <- key:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	restoreTerminal := func() error {
+		return readline.Restore(readline.GetStdin(), terminalState)
+	}
+	return keys, restoreTerminal, nil
 }
 
 func watchDev(cfg Config, adb, device, pid string) error {
@@ -169,7 +267,6 @@ func startAppLogcat(parent context.Context, adb, dir, device, pid string) (conte
 func appLogcatCommand(ctx context.Context, adb, dir, device, pid string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, adb, "-s", device, "logcat", "--pid="+pid, "-v", "time")
 	cmd.Dir = dir
-	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd
