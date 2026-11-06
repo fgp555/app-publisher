@@ -188,12 +188,12 @@ app-publisher deploy                      # Update versionCode, build, and uploa
 app-publisher openStore                   # Open the app's store listing on a connected device
 
 # Build and install
+app-publisher dev                         # Install, launch, and stream logs for a Kotlin Android app
+app-publisher dev --watch                 # Rebuild, reinstall, and relaunch when project files change
 app-publisher prebuild                    # Run Expo Prebuild
 app-publisher prebuildClean               # Run Expo Prebuild with --clean
 app-publisher clean                        # Run the Gradle clean task
 app-publisher build                       # Build debug APK, release APK, and release AAB
-app-publisher dev                         # Install, launch, and stream logs for a Kotlin Android app
-app-publisher dev --watch                 # Rebuild, reinstall, and relaunch when project files change
 app-publisher install                      # Install release with Gradle
 app-publisher assembleDebug                # Build the debug APK
 app-publisher assembleRelease              # Build the release APK

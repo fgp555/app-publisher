@@ -148,12 +148,12 @@ func printVersion() {
 
 func buildInstallMenu(cfg Config) {
 	items := []string{
+		"app-publisher dev",
+		"app-publisher dev --watch",
 		"app-publisher prebuild",
 		"app-publisher prebuildClean",
 		"app-publisher clean",
 		"app-publisher build",
-		"app-publisher dev",
-		"app-publisher dev --watch",
 		"app-publisher install",
 		"app-publisher assembleDebug",
 		"app-publisher assembleRelease",
@@ -168,12 +168,12 @@ func buildInstallMenu(cfg Config) {
 			return
 		}
 		commands := [][]string{
+			{"dev"},
+			{"dev", "--watch"},
 			{"prebuild"},
 			{"prebuildClean"},
 			{"clean"},
 			{"build"},
-			{"dev"},
-			{"dev", "--watch"},
 			{"install"},
 			{"assembleDebug"},
 			{"assembleRelease"},
@@ -252,12 +252,12 @@ Usage:
   app-publisher openStore
 
   [Build and install]
+  app-publisher dev
+  app-publisher dev --watch
   app-publisher prebuild
   app-publisher prebuildClean
   app-publisher clean
   app-publisher build
-  app-publisher dev
-  app-publisher dev --watch
   app-publisher install
   app-publisher assembleDebug
   app-publisher assembleRelease
@@ -279,10 +279,7 @@ Usage:
   app-publisher update
   app-publisher uninstall
   app-publisher --version
-  app-publisher -v
   app-publisher --help
-  app-publisher -h
-  app-publisher ?
 
 Documentation:
   https://github.com/fgp555/app-publisher#readme
