@@ -47,7 +47,7 @@ func updateCLIWindows(goPath string) error {
 	if err != nil {
 		return fmt.Errorf("PowerShell was not found; cannot replace the running app-publisher.exe")
 	}
-	alias := filepath.Join(filepath.Dir(executable), "ap.exe")
+	alias := filepath.Join(filepath.Dir(executable), "app.exe")
 	quote := func(value string) string { return "'" + strings.ReplaceAll(value, "'", "''") + "'" }
 	script := fmt.Sprintf("Start-Sleep -Seconds 2; Move-Item -LiteralPath %s -Destination %s -Force; if (Test-Path -LiteralPath %s) { Copy-Item -LiteralPath %s -Destination %s -Force }; Remove-Item -LiteralPath %s -Recurse -Force", quote(newExecutable), quote(executable), quote(alias), quote(executable), quote(alias), quote(stagingDir))
 	updater := exec.Command(powershell, "-NoProfile", "-WindowStyle", "Hidden", "-Command", script)
@@ -58,6 +58,6 @@ func updateCLIWindows(goPath string) error {
 	if err := updater.Process.Release(); err != nil {
 		return fmt.Errorf("could not detach the update process; the update remains staged at %s: %w", newExecutable, err)
 	}
-	fmt.Println("✅ Update downloaded; app-publisher and its ap launcher will be replaced after this command exits.")
+	fmt.Println("✅ Update downloaded; app-publisher and its app launcher will be replaced after this command exits.")
 	return nil
 }

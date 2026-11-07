@@ -195,6 +195,7 @@ app-publisher prebuildClean               # Run Expo Prebuild with --clean
 app-publisher clean                        # Run the Gradle clean task
 app-publisher build                       # Build debug APK, release APK, and release AAB
 app-publisher install                      # Install release with Gradle
+app-publisher open                         # Open the installed app on a connected device
 app-publisher assembleDebug                # Build the debug APK
 app-publisher assembleRelease              # Build the release APK
 app-publisher bundleRelease                # Build the release AAB
@@ -211,9 +212,9 @@ app-publisher info bundleRelease           # Inspect the existing release AAB
 app-publisher init                        # Detect the project type and initialize it
 app-publisher init kt                     # Generate the Kotlin Android deploy workflow
 app-publisher init rn                     # Generate the React Native deploy workflow
-app-publisher createAlias                 # Create the ap launcher next to the executable
+app-publisher createAlias                 # Create the app launcher next to the executable
 app-publisher update                      # Install the latest app-publisher version with Go
-app-publisher uninstall                   # Remove the installed executable and adjacent ap launcher
+app-publisher uninstall                   # Remove the installed executable and adjacent app launcher
 app-publisher --version                    # Show the app-publisher, Go, and platform versions
 app-publisher -v                           # Show the app-publisher, Go, and platform versions
 app-publisher --help                       # Show help
@@ -221,7 +222,7 @@ app-publisher -h                           # Show help
 app-publisher ?                            # Show help
 ```
 
-`app-publisher createAlias` creates `ap.exe` on Windows or an `ap` symbolic link on macOS/Linux beside the installed executable. The launcher forwards commands to the current `app-publisher` executable. It does not modify `PATH` and leaves an existing `ap` file untouched.
+`app-publisher createAlias` creates `app.exe` on Windows or an `app` symbolic link on macOS/Linux beside the installed executable. The launcher forwards commands to the current `app-publisher` executable. It does not modify `PATH` and leaves an existing `app` file untouched.
 
 For Expo projects, `prebuild` runs `npx expo prebuild`, and `prebuildClean` runs `npx expo prebuild --clean`. The clean variant deletes and regenerates the native `android/` and `ios/` directories; use it only when those directories are generated and do not contain manual native changes.
 
@@ -229,7 +230,7 @@ For Expo projects, `prebuild` runs `npx expo prebuild`, and `prebuildClean` runs
 
 `clean` runs the Gradle `clean` task. To clean and then build the release AAB, run `app-publisher clean` followed by `app-publisher bundleRelease`. The `assembleDebug`, `assembleRelease`, and `bundleRelease` commands run the corresponding Gradle task. `install` and `installRelease` run Gradle's `installRelease` task; `installDebug` runs `installDebug`. Install commands check for at least one authorized Android device or emulator with `adb` before starting Gradle. Tools are searched for in standard Android SDK/JDK locations and then on `PATH`.
 
-`dev` is for native Android/Kotlin projects. It runs `installDebug`, resolves the installed app's launcher activity, opens it with `am start`, then streams that app's logcat output. Press `R` to run `installDebug` again, restart the app, and resume log streaming; press `Ctrl+C` to stop the session. `dev --watch` monitors project files, waits briefly to group file saves, runs Gradle's incremental `installDebug`, restarts the app, and resumes log streaming. It rebuilds and restarts the app; it does not provide hot reload or a Metro-style development server. React Native/Expo projects should use their Expo development server instead.
+`open` launches the installed app for the current project on exactly one authorized Android device or emulator. It resolves the launch activity and opens it with `am start` without building or installing. `dev` is for native Android/Kotlin projects. It runs `installDebug`, resolves the installed app's launcher activity, opens it with `am start`, then streams that app's logcat output. Press `R` to run `installDebug` again, restart the app, and resume log streaming; press `Ctrl+C` to stop the session. `dev --watch` monitors project files, waits briefly to group file saves, runs Gradle's incremental `installDebug`, restarts the app, and resumes log streaming. It rebuilds and restarts the app; it does not provide hot reload or a Metro-style development server. React Native/Expo projects should use their Expo development server instead.
 
 `deploy` builds Kotlin Android projects with `clean bundleRelease`. For React Native/Expo projects, it runs `bundleRelease` without `clean` to avoid cleaning native CMake/Gradle outputs before the build.
 
@@ -241,7 +242,7 @@ Commands display status with emojis. `upload` shows a percentage bar based on ch
 
 When present, the program finds the nearest `app-publisher.json` while traversing upward from the current directory and stops at the nearest Gradle root. You can omit it if automatic detection supports your project and `APP_PUBLISHER_KEY` is set.
 
-`app-publisher update` runs `go install github.com/fgp555/app-publisher@latest`; Go must be installed and available on `PATH`. `app-publisher uninstall` removes the running app-publisher executable and its adjacent `ap` launcher. It does not remove Go or project files.
+`app-publisher update` runs `go install github.com/fgp555/app-publisher@latest`; Go must be installed and available on `PATH`. `app-publisher uninstall` removes the running app-publisher executable and its adjacent `app` launcher. It does not remove Go or project files.
 
 Running `app-publisher` without a command opens the interactive menu, grouped into Google Play, Build and install, Info, and Project setup. Project setup offers `app-publisher init`, `app-publisher init kt`, `app-publisher init rn`, `app-publisher createAlias`, `app-publisher update`, `app-publisher uninstall`, `app-publisher --version`, and `app-publisher --help`. Deploy and publishing actions ask for confirmation before running.
 

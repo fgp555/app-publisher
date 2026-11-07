@@ -20,10 +20,10 @@ func uninstallCLI() error {
 		return fmt.Errorf("could not remove app-publisher executable %s: %w", executable, err)
 	}
 
-	alias := filepath.Join(filepath.Dir(executable), "ap")
+	alias := filepath.Join(filepath.Dir(executable), "app")
 	if err := os.Remove(alias); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("app-publisher was removed, but could not remove alias %s: %w", alias, err)
 	}
-	fmt.Printf("🗑️  Removed app-publisher and its adjacent ap launcher from %s.\n", filepath.Dir(executable))
+	fmt.Printf("🗑️  Removed app-publisher and its adjacent app launcher from %s.\n", filepath.Dir(executable))
 	return nil
 }

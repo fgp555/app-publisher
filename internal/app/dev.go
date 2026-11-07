@@ -62,13 +62,28 @@ func launchDevApp(adb, dir, device, packageName string) error {
 
 	activity := launcherComponent(string(output))
 	if activity == "" {
-		return fmt.Errorf("could not find a launcher activity for %s; package manager returned %q", packageName, strings.TrimSpace(string(output)))
+		return fmt.Errorf("could not find a launcher activity for %s; make sure the app is installed and has a launcher activity (package manager returned %q)", packageName, strings.TrimSpace(string(output)))
 	}
 
 	if err := runTool(adb, dir, "-s", device, "shell", "am", "start", "-n", activity); err != nil {
 		return fmt.Errorf("could not launch %s using its launcher activity %s: %w", packageName, activity, err)
 	}
 	return nil
+}
+
+func openInstalledApp(cfg Config) error {
+	adb, devices, err := connectedAndroidDevices(cfg)
+	if err != nil {
+		return err
+	}
+	if len(devices) == 0 {
+		return noAuthorizedAndroidDeviceError()
+	}
+	if len(devices) > 1 {
+		return fmt.Errorf("app-publisher open requires exactly one authorized Android device or emulator; found %d. Disconnect the others and retry", len(devices))
+	}
+
+	return launchDevApp(adb, cfg.GradleRoot, devices[0], cfg.Pkg)
 }
 
 func launcherComponent(output string) string {

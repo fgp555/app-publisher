@@ -9,7 +9,7 @@ func isKnownCommand(command string) bool {
 	switch command {
 	case "build", "dev", "prebuild", "prebuildClean", "createAlias", "update", "uninstall",
 		"init", "assembleDebug", "assembleRelease", "bundleRelease", "installDebug",
-		"installRelease", "clean", "install", "info", "show", "openStore", "upload", "deploy":
+		"installRelease", "clean", "install", "open", "info", "show", "openStore", "upload", "deploy":
 		return true
 	default:
 		return false
@@ -113,6 +113,12 @@ func runCI(cfg Config, args []string) error {
 		}
 		fmt.Println("📲 Running Gradle installRelease...")
 		return runGradleTasks(cfg, "installRelease")
+
+	case "open":
+		if err := requireArgs(args, 1, "open"); err != nil {
+			return err
+		}
+		return openInstalledApp(cfg)
 
 	case "info":
 		if len(args) > 2 {

@@ -19,7 +19,7 @@ func uninstallCLI() error {
 		return fmt.Errorf("uninstall must be run from the installed app-publisher.exe")
 	}
 
-	alias := filepath.Join(filepath.Dir(executable), "ap.exe")
+	alias := filepath.Join(filepath.Dir(executable), "app.exe")
 	powershell, err := exec.LookPath("powershell.exe")
 	if err != nil {
 		return fmt.Errorf("PowerShell was not found; cannot schedule removal of the running executable")
@@ -35,6 +35,6 @@ func uninstallCLI() error {
 		return fmt.Errorf("could not detach app-publisher removal process: %w", err)
 	}
 
-	fmt.Printf("🗑️  Scheduled removal of %s and its adjacent ap.exe launcher.\n", executable)
+	fmt.Printf("🗑️  Scheduled removal of %s and its adjacent app.exe launcher.\n", executable)
 	return nil
 }
